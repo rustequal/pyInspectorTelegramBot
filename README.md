@@ -59,7 +59,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /group_add@bot_username
 </pre>
 
-- If messages about new group members need to be sent to other users, then you need to reply to their messages in the telegram group with the "/user_add@bot_username" command to add them as bot users.
+- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@bot_username" command to add them as bot users.
 <pre>
 /user_add@bot_username
 </pre>
