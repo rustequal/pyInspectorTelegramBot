@@ -54,13 +54,17 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 </pre>
 
 - Add the bot to the telegram group as a regular user. Bot access to messages is not needed.
-- Open the group chat and enter the command "/group_add", where "@bot_username" is the username of the new bot:
+- Open the group chat and enter the command "/group_add@bot_username", where "@bot_username" is the username of the new bot:
 <pre>
 /group_add@bot_username
 </pre>
 
-- If messages about new group members need to be sent to other users, then you need to reply to their messages in the telegram group with the "/user_add" command to add them as bot users.
-- For help on all commands, use the command "/help".
+- If messages about new group members need to be sent to other users, then you need to reply to their messages in the telegram group with the "/user_add@bot_username" command to add them as bot users.
+<pre>
+/user_add@bot_username
+</pre>
+
+- For help on all commands, use the command "/help" in a bot chat.
 
 ## References
 
