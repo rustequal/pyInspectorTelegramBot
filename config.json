@@ -1,0 +1,10 @@
+{
+  "token": "",
+  "owner_pass_salt": "",
+  "owner_pass_hash": "",
+  "owner_id": "",
+  "owner_enabled": true,
+  "groups": [],
+  "users": [],
+  "language": "en"
+}

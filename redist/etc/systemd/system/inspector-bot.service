@@ -1,0 +1,14 @@
+[Unit]
+Description=Inspector Telegram Bot
+After=syslog.target network.target
+
+[Service]
+Type=simple
+TimeoutSec=15s
+User=bot
+Group=bot
+WorkingDirectory=/opt/inspector-bot
+ExecStart=/opt/inspector-bot/telegram/bin/python /opt/inspector-bot/bot.py
+
+[Install]
+WantedBy=multi-user.target
