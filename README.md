@@ -64,7 +64,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /user_add@bot_username
 </pre>
 
-- For help on all commands, use the command "/help" in a bot chat.
+- For help on all commands, use the command "/help" in the bot's chat.
 
 ## References
 
