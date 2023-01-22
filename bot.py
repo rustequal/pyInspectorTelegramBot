@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.04'
+VERSION = '1.05'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -103,6 +103,15 @@ def get_age(user_id):
     res = '~ '
   date = datetime.datetime.fromtimestamp(tst[1] / 1e3)
   return res + str(date.month).zfill(2) + '/' + str(date.year)
+
+
+def is_command_allow_user(message, owner_set):
+  res = message.chat.type == 'private' \
+      and (not owner_set or config['owner_id'])
+  if res and config['owner_id']:
+    uids = [config['owner_id'], ] + get_ids('users')
+    res = message.chat.id in uids
+  return res
 
 
 def update_group(group):
@@ -381,8 +390,6 @@ def command_user_del(message):
 
 @bot.message_handler(commands=['user_list'])
 def command_user_list(message):
-  if message.chat.type != 'private':
-    return
   check_owner_set(message.chat.id)
   if not check_owner(message.chat.id):
     return
@@ -399,39 +406,40 @@ def command_user_list(message):
     bot.send_message(message.chat.id, msg[lang]['mess_user_empty'])
 
 
+def process_chat_member(chat_id, user_id):
+  text, log_text, photo = '', '', None
+  for group in config['groups']:
+    update_group(group)
+    member = None
+    try:
+      member = bot.get_chat_member(group['id'], user_id)
+    except apihelper.ApiTelegramException:
+      pass
+    if member is not None:
+      if log_text:
+        log_text += ', '
+      log_text += f'Group "{group["title"]}" (ID:{group["id"]}): ' \
+          f'{str(member)}'
+      if not text:
+        text = get_user_text(member.user)
+        photo = get_user_photo(member.user)
+      text += f'\n<u>{group["title"]}</u>\n'
+      text += get_member_text(member)
+
+  if text:
+    if photo is not None:
+      bot.send_photo(chat_id, photo, text)
+    else:
+      bot.send_message(chat_id, text)
+  else:
+    bot.send_message(chat_id, msg[lang]['mess_user_not_found'])
+  logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
+
+
 @bot.message_handler(commands=['chat_member'])
 def command_chat_member(message):
-
-  def get_info(user_id):
-    text, log_text, photo = '', '', None
-    for group in config['groups']:
-      update_group(group)
-      member = None
-      try:
-        member = bot.get_chat_member(group['id'], user_id)
-      except apihelper.ApiTelegramException:
-        pass
-      if member is not None:
-        if log_text:
-          log_text += ', '
-        log_text += f'Group "{group["title"]}" (ID:{group["id"]}): ' \
-            f'{str(member)}'
-        if not text:
-          text = get_user_text(member.user)
-          photo = get_user_photo(member.user)
-        text += f'\n<u>{group["title"]}</u>\n'
-        text += get_member_text(member)
-    return (text, log_text, photo)
-
-
-  if message.chat.type != 'private':
-    return
   check_owner_set(message.chat.id)
-  if config['owner_id']:
-    uids = [config['owner_id'], ] + get_ids('users')
-    if message.chat.id not in uids:
-      return
-  else:
+  if not is_command_allow_user(message, True):
     return
   args = message.text.split()[1:]
   if len(args) != 1:
@@ -439,25 +447,26 @@ def command_chat_member(message):
   user_id = args[0][1:] if args[0][0] == '@' else args[0]
   if not user_id or not user_id.isdigit():
     return
-  text, log_text, photo = get_info(user_id)
-  if text:
-    if photo is not None:
-      bot.send_photo(message.chat.id, photo, text)
-    else:
-      bot.send_message(message.chat.id, text)
+  process_chat_member(message.chat.id, user_id)
+
+
+@bot.message_handler(func=lambda message: message.chat.type == 'private'
+                     and (message.forward_from is not None
+                     or message.forward_sender_name is not None))
+def message_forward_from(message):
+  check_owner_set(message.chat.id)
+  if not is_command_allow_user(message, True):
+    return
+  if message.forward_from is None:
+    bot.send_message(message.chat.id, msg[lang]['mess_member_hidden'])
   else:
-    bot.send_message(message.chat.id, msg[lang]['mess_user_not_found'])
-  logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
+    process_chat_member(message.chat.id, message.forward_from.id)
 
 
 @bot.message_handler(commands=['help'])
 def command_help(message):
-  if message.chat.type != 'private':
+  if not is_command_allow_user(message, False):
     return
-  if config['owner_id']:
-    uids = [config['owner_id'], ] + get_ids('users')
-    if message.chat.id not in uids:
-      return
   text = f'<b>{msg[lang]["mess_bot_commands"]}:</b>\n'
   if not config['owner_id'] or check_owner(message.chat.id):
     text += msg[lang]['mess_bot_help_owner']

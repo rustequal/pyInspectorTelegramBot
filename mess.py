@@ -30,6 +30,7 @@ msg = {
           'mess_user_deleted': 'User deleted successfully',
           'mess_user_empty': 'No users added',
           'mess_user_list': 'Users',
+          'mess_member_hidden': 'The account was hidden by the user',
           'mess_bot_commands': 'Bot commands',
           'mess_bot_started': 'The bot has started and will send messages',
           'mess_bot_stopped': 'The bot has been stopped and will not send ' \
@@ -78,6 +79,7 @@ msg = {
           'mess_user_deleted': 'Пользователь удален успешно',
           'mess_user_empty': 'Пользователи не добавлены',
           'mess_user_list': 'Пользователи',
+          'mess_member_hidden': 'Аккаунт скрыт пользователем',
           'mess_bot_commands': 'Команды бота',
           'mess_bot_started': 'Бот запущен и будет присылать сообщения',
           'mess_bot_stopped': 'Бот остановлен и не будет присылать сообщения',
