@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.03'
+VERSION = '1.04'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
