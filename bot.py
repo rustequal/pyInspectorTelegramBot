@@ -1,7 +1,6 @@
 """
 Telegram bot working in groups. Sends available information about new group
-members (ID, First Name, Last Name, Username, Language Code, Profile Photo)
-to group administrators.
+members to group administrators.
 """
 
 import datetime
@@ -37,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.01'
+VERSION = '1.03'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -61,6 +60,14 @@ def check_owner_set(chat_id):
 
 def get_ids(section):
   return [x['id'] for x in config[section]]
+
+
+def get_enabled_uids():
+  uids = [config['owner_id'], ] if config['owner_enabled'] else []
+  for user in config['users']:
+    if user['enabled'] and user['id'] not in uids:
+      uids.append(user['id'])
+  return uids
 
 
 def get_timestamp(user_id):
@@ -98,56 +105,90 @@ def get_age(user_id):
   return res + str(date.month).zfill(2) + '/' + str(date.year)
 
 
-def send_message(member, title):
-
-  def get_text(member):
-    member, res = member.to_dict(), ''
-    keys = ['id', 'first_name', 'last_name', 'username', 'language_code']
-    if title:
-      res += f'<u>{title}</u>\n'
-    for key in keys:
-      if key in member and not member[key] is None:
-        val = '@' + str(member[key]) if key == 'username' \
-            else str(member[key])
-        res += f'<b>{msg[lang][key]}:</b> {val}\n'
-    if member['id'] < int(list(ages.keys())[-1]):
-      rd_key = msg[lang]["registration_date"]
-      res += f'<b>{rd_key}:</b> {get_age(member["id"])}\n'
-    return res
+def update_group(group):
+  try:
+    chat = bot.get_chat(group['id'])
+    if group['title'] != chat.title:
+      group['title'] = chat.title
+      save_file(CONFIG_FILE, config)
+      logging.debug('Group ID:%d data updated: %s', group['id'], str(group))
+  except apihelper.ApiTelegramException:
+    pass
 
 
-  def get_photo(member):
-    res = None
+def update_user(user):
+  member = None
+  for group in config['groups']:
     try:
-      upp = bot.get_user_profile_photos(member.id)
-      if upp.total_count > 0:
-        file_id = upp.photos[0][0].file_id
-        res = bot.download_file(bot.get_file(file_id).file_path)
-    except:
+      member = bot.get_chat_member(group['id'], user['id'])
+      if member.status != 'left':
+        break
+      member = None
+    except apihelper.ApiTelegramException:
       pass
-    txt = f'New member ID:{member.id} profile photo '
-    if res is None:
-      txt += 'is not available'
-    else:
-      txt += 'downloaded successfully'
-    logging.debug(txt)
-    return res
+
+  if member is not None and (user['username'] != member.user.username
+                             or user['fullname'] != member.user.full_name):
+    user['username'] = member.user.username
+    user['fullname'] = member.user.full_name
+    save_file(CONFIG_FILE, config)
+    logging.debug('User ID:%d data updated: %s', user['id'], str(user))
 
 
-  text = get_text(member)
-  photo = get_photo(member)
+def get_user_text(user):
+  user, text = user.to_dict(), ''
+  keys = ['id', 'first_name', 'last_name', 'username', 'language_code',
+          'is_premium']
+  for key in keys:
+    if key in user and not user[key] is None:
+      if key == 'username':
+        val = '@' + str(user[key])
+      elif key == 'is_premium' and user[key]:
+        val = msg[lang]['yes']
+      else:
+        val = str(user[key])
+      text += f'<b>{msg[lang][key]}:</b> {val}\n'
+  if user['id'] < int(list(ages.keys())[-1]):
+    rd_key = msg[lang]["registration_date"]
+    text += f'<b>{rd_key}:</b> {get_age(user["id"])}\n'
+  return text
 
-  uids = [config['owner_id'], ] if config['owner_enabled'] else []
-  for user in config['users']:
-    if user['enabled'] and user['id'] not in uids:
-      uids.append(user['id'])
+
+def get_member_text(member):
+  text = f'<b>{msg[lang]["status"]}:</b> {str(member.status)}\n'
+  return text
+
+
+def get_user_photo(user):
+  photo = None
+  try:
+    upp = bot.get_user_profile_photos(user.id)
+    if upp.total_count > 0:
+      file_id = upp.photos[0][0].file_id
+      photo = bot.download_file(bot.get_file(file_id).file_path)
+  except apihelper.ApiException:
+    pass
+  log_text = f'Member ID:{user.id} profile photo '
+  if photo is None:
+    log_text += 'is not available'
+  else:
+    log_text += 'downloaded successfully'
+  logging.debug(log_text)
+  return photo
+
+
+def send_message(user, title):
+  text = f'<u>{title}</u>\n' if title else ''
+  text += get_user_text(user)
+  photo = get_user_photo(user)
+  uids = get_enabled_uids()
   for user_id in uids:
     if photo is not None:
       bot.send_photo(user_id, photo, text)
     else:
       bot.send_message(user_id, text)
     logging.debug('Message about new member ID:%d sent to user ID:%d',
-                  member.id, user_id)
+                  user.id, user_id)
 
 
 @bot.message_handler(content_types=["new_chat_members"])
@@ -156,11 +197,11 @@ def message_new_chat_members(message):
   if message.chat.id not in gids:
     return
   title = message.chat.title if len(config['groups']) > 1 else ''
-  for member in message.new_chat_members:
-    if not member.is_bot:
+  for user in message.new_chat_members:
+    if not user.is_bot:
       logging.info('New member in group "%s": %s',
-                   message.chat.title, str(member))
-      send_message(member, title)
+                   message.chat.title, str(user))
+      send_message(user, title)
 
 
 @bot.message_handler(commands=['set_owner'])
@@ -251,15 +292,7 @@ def command_group_list(message):
   if config['groups']:
     text = f'<b>{msg[lang]["mess_group_list"]}:</b>\n'
     for group in config['groups']:
-      try:
-        chat = bot.get_chat(group['id'])
-        if group['title'] != chat.title:
-          group['title'] = chat.title
-          save_file(CONFIG_FILE, config)
-          logging.debug('Group ID:%d data updated: %s',
-                        group['id'], str(group))
-      except:
-        pass
+      update_group(group)
       text += f'{group["id"]} ({group["title"]})\n'
     bot.send_message(message.chat.id, text)
   else:
@@ -356,23 +389,7 @@ def command_user_list(message):
   if config['users']:
     text = f'<b>{msg[lang]["mess_user_list"]}:</b>\n'
     for user in config['users']:
-      member = None
-      for group in config['groups']:
-        try:
-          member = bot.get_chat_member(group['id'], user['id'])
-          if member.status != 'left':
-            break
-          member = None
-        except:
-          pass
-
-      if member is not None and (user['username'] != member.user.username
-                                 or user['fullname'] != member.user.full_name):
-        user['username'] = member.user.username
-        user['fullname'] = member.user.full_name
-        save_file(CONFIG_FILE, config)
-        logging.debug('User ID:%d data updated: %s', user['id'], str(user))
-
+      update_user(user)
       text += str(user['id'])
       if user['username']:
         text += f' @{user["username"]}'
@@ -380,6 +397,57 @@ def command_user_list(message):
     bot.send_message(message.chat.id, text)
   else:
     bot.send_message(message.chat.id, msg[lang]['mess_user_empty'])
+
+
+@bot.message_handler(commands=['chat_member'])
+def command_chat_member(message):
+
+  def get_info(user_id):
+    text, log_text, photo = '', '', None
+    for group in config['groups']:
+      update_group(group)
+      member = None
+      try:
+        member = bot.get_chat_member(group['id'], user_id)
+      except apihelper.ApiTelegramException:
+        pass
+      if member is not None:
+        if log_text:
+          log_text += ', '
+        log_text += f'Group "{group["title"]}" (ID:{group["id"]}): ' \
+            f'{str(member)}'
+        if not text:
+          text = get_user_text(member.user)
+          photo = get_user_photo(member.user)
+        text += f'\n<u>{group["title"]}</u>\n'
+        text += get_member_text(member)
+    return (text, log_text, photo)
+
+
+  if message.chat.type != 'private':
+    return
+  check_owner_set(message.chat.id)
+  if config['owner_id']:
+    uids = [config['owner_id'], ] + get_ids('users')
+    if message.chat.id not in uids:
+      return
+  else:
+    return
+  args = message.text.split()[1:]
+  if len(args) != 1:
+    return
+  user_id = args[0][1:] if args[0][0] == '@' else args[0]
+  if not user_id or not user_id.isdigit():
+    return
+  text, log_text, photo = get_info(user_id)
+  if text:
+    if photo is not None:
+      bot.send_photo(message.chat.id, photo, text)
+    else:
+      bot.send_message(message.chat.id, text)
+  else:
+    bot.send_message(message.chat.id, msg[lang]['mess_user_not_found'])
+  logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
 
 
 @bot.message_handler(commands=['help'])

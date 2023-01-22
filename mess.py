@@ -6,9 +6,12 @@ msg = {
          'last_name': 'Last Name',
          'username': 'Username',
          'language_code': 'Language',
+         'is_premium': 'Premium',
+         'status': 'Status',
          'registration_date': 'Registration Date',
          'before': 'before ',
          'after': 'after ',
+         'yes': 'yes',
          'mess_password':
             'The password must contain numbers, uppercase and lowercase ' \
             'letters. The password must be between 16 and 20 characters ' \
@@ -43,6 +46,7 @@ msg = {
               '/user_list - show list of users\n',
           'mess_bot_help_user': '/start - start the bot\n' \
               '/stop - stop the bot\n' \
+              '/chat_member <code>id</code> - show info about chat member\n' \
               '/help - show list of bot commands'
           },
 
@@ -51,9 +55,12 @@ msg = {
          'last_name': 'Фамилия',
          'username': 'Имя пользователя',
          'language_code': 'Язык',
+         'is_premium': 'Премиум',
+         'status': 'Статус',
          'registration_date': 'Дата регистрации',
          'before': 'до ',
          'after': 'после ',
+         'yes': 'да',
          'mess_password':
             'Пароль должен содержать цифры, заглавные и строчные буквы. ' \
             'Длина пароля должна быть от 16 до 20 символов.',
@@ -87,6 +94,8 @@ msg = {
               '/user_list - вывести список пользователей\n',
           'mess_bot_help_user': '/start - запустить бота\n' \
               '/stop - остановить бота\n' \
+              '/chat_member <code>id</code> - вывести информацию ' \
+                  'об участнике\n' \
               '/help - показать список команд бота'
           }
 }

@@ -59,9 +59,14 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /group_add@bot_username
 </pre>
 
-- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@bot_username" command to add them as bot users.
+- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@bot_username" command to add them as bot users:
 <pre>
 /user_add@bot_username
+</pre>
+
+- To display information about a chat member, use the command "/chat_member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
+<pre>
+/chat_member &lt;ID&gt;
 </pre>
 
 - For help on all commands, use the command "/help" in the bot's chat.
