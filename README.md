@@ -2,7 +2,7 @@
 [![GPL2](https://img.shields.io/badge/license-GPL2-green)](https://github.com/rustequal/pyInspectorTelegram/blob/main/LICENSE)
 
 # pyInspectorTelegramBot
-Telegram bot working in groups. Sends available information about new group members (ID, First Name, Last Name, Username, Language Code, Profile Photo and the approximate date of registration) to group administrators.
+Telegram bot working in groups. Sends available information about new group members (ID, First Name, Last Name, Username, Language Code, Premium Status, Profile Photo and the approximate date of registration) to group administrators.
 <p align="left">
   <a href="#"><img src="docs/jonsnow.png" /></a>
 </p>
