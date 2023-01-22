@@ -69,7 +69,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /chat_member &lt;ID&gt;
 </pre>
 
-- To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by privacy settings, then you will not be able to get the information. In this case, use the command "/chat_member" and its numeric ID, if it is known.
+- To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by privacy settings, then you will not be able to do that. In this case, use the command "/chat_member" and its numeric ID, if it's known.
 - For help on all commands, use the command "/help" in the bot's chat.
 
 ## References
