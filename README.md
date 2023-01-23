@@ -53,7 +53,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /set_owner &lt;PASSWORD&gt;
 </pre>
 
-- Add the bot to the telegram group as a regular user. Bot access to messages is not needed.
+- Add the bot to the telegram group as an administrator.
 - Open the group chat and enter the command "/group_add@bot_username", where "@bot_username" is the username of the new bot:
 <pre>
 /group_add@bot_username
@@ -64,12 +64,12 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /user_add@bot_username
 </pre>
 
-- To display information about a chat member, use the command "/chat_member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
+- To display information about a chat member, use the command "/member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
 <pre>
-/chat_member &lt;ID&gt;
+/member &lt;ID&gt;
 </pre>
 
-- To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by the privacy settings, then you will not be able to do this. In this case, you will also not be able to get information with the command "/chat_member".
+- To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by the privacy settings, then you will not be able to do this. In this case, you will also not be able to get information with the command "/member".
 - For help on all commands, use the command "/help" in the bot's chat.
 
 ## References

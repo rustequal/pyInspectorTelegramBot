@@ -47,7 +47,7 @@ msg = {
               '/user_list - show list of users\n',
           'mess_bot_help_user': '/start - start the bot\n' \
               '/stop - stop the bot\n' \
-              '/chat_member <code>id</code> - show info about chat member\n' \
+              '/member <code>id</code> - show info about chat member\n' \
               '/help - show list of bot commands'
           },
 
@@ -96,8 +96,7 @@ msg = {
               '/user_list - вывести список пользователей\n',
           'mess_bot_help_user': '/start - запустить бота\n' \
               '/stop - остановить бота\n' \
-              '/chat_member <code>id</code> - вывести информацию ' \
-              'об участнике\n' \
+              '/member <code>id</code> - вывести информацию об участнике\n' \
               '/help - показать список команд бота'
           }
 }

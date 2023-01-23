@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.05'
+VERSION = '1.06'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -436,7 +436,7 @@ def process_chat_member(chat_id, user_id):
   logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
 
 
-@bot.message_handler(commands=['chat_member'])
+@bot.message_handler(commands=['member'])
 def command_chat_member(message):
   check_owner_set(message.chat.id)
   if not is_command_allow_user(message, True):
