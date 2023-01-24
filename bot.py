@@ -36,16 +36,19 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.06'
+VERSION = '1.07'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
-lang = config['language']
 ages = load_file(AGES_FILE)
 apihelper.ENABLE_MIDDLEWARE = True
 bot = TeleBot(config['token'], parse_mode='HTML', threaded=False)
 LOG_FILE = os.path.splitext(os.path.basename(__file__))[0] + '.log'
 LOG_LEVEL = logging.INFO
+
+
+def lang():
+  return config['language']
 
 
 def check_owner(user_id):
@@ -54,8 +57,8 @@ def check_owner(user_id):
 
 def check_owner_set(chat_id):
   if not config['owner_id']:
-    bot.send_message(chat_id, msg[lang]['mess_owner_not_set']
-                     + msg[lang]['mess_bot_help_tip'])
+    bot.send_message(chat_id, msg[lang()]['mess_owner_not_set']
+                     + msg[lang()]['mess_bot_help_tip'])
 
 
 def get_ids(section):
@@ -96,9 +99,9 @@ def get_timestamp(user_id):
 def get_age(user_id):
   tst = get_timestamp(user_id)
   if tst[0] < 0:
-    res = msg[lang]['before']
+    res = msg[lang()]['before']
   elif tst[0] > 0:
-    res = msg[lang]['after']
+    res = msg[lang()]['after']
   else:
     res = '~ '
   date = datetime.datetime.fromtimestamp(tst[1] / 1e3)
@@ -153,18 +156,18 @@ def get_user_text(user):
       if key == 'username':
         val = '@' + str(user[key])
       elif key == 'is_premium' and user[key]:
-        val = msg[lang]['yes']
+        val = msg[lang()]['yes']
       else:
         val = str(user[key])
-      text += f'<b>{msg[lang][key]}:</b> {val}\n'
+      text += f'<b>{msg[lang()][key]}:</b> {val}\n'
   if user['id'] < int(list(ages.keys())[-1]):
-    rd_key = msg[lang]["registration_date"]
+    rd_key = msg[lang()]["registration_date"]
     text += f'<b>{rd_key}:</b> {get_age(user["id"])}\n'
   return text
 
 
 def get_member_text(member):
-  text = f'<b>{msg[lang]["status"]}:</b> {str(member.status)}\n'
+  text = f'<b>{msg[lang()]["status"]}:</b> {str(member.status)}\n'
   return text
 
 
@@ -233,11 +236,11 @@ def command_set_owner(message):
       config['owner_pass_salt'] = base64.b64encode(salt).decode('ascii')
       config['owner_id'] = message.chat.id
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang]['mess_owner_succ']
-                       + msg[lang]['mess_bot_help_tip'])
+      bot.send_message(message.chat.id, msg[lang()]['mess_owner_succ']
+                       + msg[lang()]['mess_bot_help_tip'])
       logging.info('Owner ID:%d has been set successfully', config['owner_id'])
   else:
-    bot.send_message(message.chat.id, msg[lang]['mess_password'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_password'])
 
 
 @bot.message_handler(commands=['group_add'])
@@ -254,7 +257,7 @@ def command_group_add(message):
   else:
     config['groups'].append(group_dict)
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang]['mess_group_added'])
+  bot.send_message(message.chat.id, msg[lang()]['mess_group_added'])
   logging.info('Group "%s" added: %s', message.chat.title, str(group_dict))
 
 
@@ -283,14 +286,14 @@ def command_group_del(message):
       group_dict = group
       config['groups'].pop(index)
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang]['mess_group_deleted'])
+      bot.send_message(message.chat.id, msg[lang()]['mess_group_deleted'])
       logging.info('Group "%s" deleted: %s', group_dict['title'],
                    str(group_dict))
       found = True
       break
 
   if not found:
-    bot.send_message(message.chat.id, msg[lang]['mess_group_not_found'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_group_not_found'])
 
 
 @bot.message_handler(commands=['group_list'])
@@ -299,27 +302,25 @@ def command_group_list(message):
   if not check_owner(message.chat.id):
     return
   if config['groups']:
-    text = f'<b>{msg[lang]["mess_group_list"]}:</b>\n'
+    text = f'<b>{msg[lang()]["mess_group_list"]}:</b>\n'
     for group in config['groups']:
       update_group(group)
       text += f'{group["id"]} ({group["title"]})\n'
     bot.send_message(message.chat.id, text)
   else:
-    bot.send_message(message.chat.id, msg[lang]['mess_group_empty'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_group_empty'])
 
 
 @bot.message_handler(commands=['lang'])
 def command_lang(message):
-  global lang
   if config['owner_id'] and not check_owner(message.chat.id):
     return
   lkeys = list(msg.keys())
-  index = (lkeys.index(lang) + 1) % len(lkeys)
+  index = (lkeys.index(lang()) + 1) % len(lkeys)
   config['language'] = lkeys[index]
-  lang = config['language']
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang]['mess_change_lang'])
-  logging.info('Language changed to "%s"', lang)
+  bot.send_message(message.chat.id, msg[lang()]['mess_change_lang'])
+  logging.info('Language changed to "%s"', lang())
 
 
 @bot.message_handler(commands=['user_add'])
@@ -346,7 +347,7 @@ def command_user_add(message):
   else:
     config['users'].append(user_dict)
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang]['mess_user_added'])
+  bot.send_message(message.chat.id, msg[lang()]['mess_user_added'])
   logging.info('User ID:%d added: %s', user_id, str(user_dict))
 
 
@@ -379,13 +380,13 @@ def command_user_del(message):
       user_dict = user
       config['users'].pop(index)
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang]['mess_user_deleted'])
+      bot.send_message(message.chat.id, msg[lang()]['mess_user_deleted'])
       logging.info('User ID:%d deleted: %s', user_dict['id'], str(user_dict))
       found = True
       break
 
   if not found:
-    bot.send_message(message.chat.id, msg[lang]['mess_user_not_found'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_user_not_found'])
 
 
 @bot.message_handler(commands=['user_list'])
@@ -394,7 +395,7 @@ def command_user_list(message):
   if not check_owner(message.chat.id):
     return
   if config['users']:
-    text = f'<b>{msg[lang]["mess_user_list"]}:</b>\n'
+    text = f'<b>{msg[lang()]["mess_user_list"]}:</b>\n'
     for user in config['users']:
       update_user(user)
       text += str(user['id'])
@@ -403,7 +404,7 @@ def command_user_list(message):
       text += f' ({user["fullname"]})\n'
     bot.send_message(message.chat.id, text)
   else:
-    bot.send_message(message.chat.id, msg[lang]['mess_user_empty'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_user_empty'])
 
 
 def process_chat_member(chat_id, user_id):
@@ -432,7 +433,7 @@ def process_chat_member(chat_id, user_id):
     else:
       bot.send_message(chat_id, text)
   else:
-    bot.send_message(chat_id, msg[lang]['mess_user_not_found'])
+    bot.send_message(chat_id, msg[lang()]['mess_user_not_found'])
   logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
 
 
@@ -458,7 +459,7 @@ def message_forward_from(message):
   if not is_command_allow_user(message, True):
     return
   if message.forward_from is None:
-    bot.send_message(message.chat.id, msg[lang]['mess_member_hidden'])
+    bot.send_message(message.chat.id, msg[lang()]['mess_member_hidden'])
   else:
     process_chat_member(message.chat.id, message.forward_from.id)
 
@@ -467,10 +468,10 @@ def message_forward_from(message):
 def command_help(message):
   if not is_command_allow_user(message, False):
     return
-  text = f'<b>{msg[lang]["mess_bot_commands"]}:</b>\n'
+  text = f'<b>{msg[lang()]["mess_bot_commands"]}:</b>\n'
   if not config['owner_id'] or check_owner(message.chat.id):
-    text += msg[lang]['mess_bot_help_owner']
-  text += msg[lang]['mess_bot_help_user']
+    text += msg[lang()]['mess_bot_help_owner']
+  text += msg[lang()]['mess_bot_help_user']
   bot.send_message(message.chat.id, text)
 
 
@@ -491,7 +492,7 @@ def command_start_stop(message, value, key):
       return
     save_file(CONFIG_FILE, config)
     bot.send_message(message.chat.id,
-                     msg[lang][key] + msg[lang]['mess_bot_help_tip'])
+                     msg[lang()][key] + msg[lang()]['mess_bot_help_tip'])
     com_msg = 'started' if value else 'stopped'
     logging.info('%s %s the bot', usr_msg, com_msg)
 
