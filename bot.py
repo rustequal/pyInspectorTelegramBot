@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.08'
+VERSION = '1.09'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -458,9 +458,9 @@ def command_chat_member(message):
   process_chat_member(message.chat.id, user_id)
 
 
-@bot.message_handler(func=lambda message: message.chat.type == 'private'
-                     and (message.forward_from is not None
-                     or message.forward_sender_name is not None),
+@bot.message_handler(func=lambda message: message.forward_from is not None
+                     or message.forward_sender_name is not None,
+                     chat_types=['private'],
                      content_types=util.content_type_media)
 def message_forward_from(message):
   check_owner_set(message.chat.id)
