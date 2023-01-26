@@ -12,7 +12,7 @@ import math
 import sys
 import re
 import os
-from telebot import apihelper, TeleBot
+from telebot import apihelper, TeleBot, util
 from mess import msg
 
 
@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.07'
+VERSION = '1.08'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -203,17 +203,24 @@ def send_message(user, title):
                   user.id, user_id)
 
 
-@bot.message_handler(content_types=["new_chat_members"])
-def message_new_chat_members(message):
+@bot.chat_member_handler()
+def message_chat_member(message):
   gids = get_ids('groups')
   if message.chat.id not in gids:
     return
-  title = message.chat.title if len(config['groups']) > 1 else ''
-  for user in message.new_chat_members:
-    if not user.is_bot:
-      logging.info('New member in group "%s": %s',
-                   message.chat.title, str(user))
-      send_message(user, title)
+  new = message.new_chat_member
+  logging.debug('Chat "%s" member update: {\'new_chat_member\': %s, '
+                '\'difference\': %s}', message.chat.title, str(new),
+                str(message.difference))
+  if 'is_member' in message.difference \
+      and message.difference['is_member'] == [False, True] \
+      or 'status' in message.difference \
+      and message.difference['status'][0] == 'left' \
+      and message.difference['status'][1] not in ['restricted', 'kicked']:
+    logging.info('New member in group "%s": %s',
+                  message.chat.title, str(new))
+    title = message.chat.title if len(config['groups']) > 1 else ''
+    send_message(new.user, title)
 
 
 @bot.message_handler(commands=['set_owner'])
@@ -453,7 +460,8 @@ def command_chat_member(message):
 
 @bot.message_handler(func=lambda message: message.chat.type == 'private'
                      and (message.forward_from is not None
-                     or message.forward_sender_name is not None))
+                     or message.forward_sender_name is not None),
+                     content_types=util.content_type_media)
 def message_forward_from(message):
   check_owner_set(message.chat.id)
   if not is_command_allow_user(message, True):
@@ -510,6 +518,8 @@ def command_stop(message):
 if LOG_LEVEL == logging.DEBUG:
   @bot.middleware_handler(update_types=['message'])
   def log_message(_, message):
+    if message.chat.type != 'private':
+      return
     if message.text is not None:
       cmd = message.text.split()
       if 'owner' in cmd[0]:
