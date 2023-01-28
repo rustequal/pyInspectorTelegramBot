@@ -54,14 +54,15 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 </pre>
 
 - Add the bot to the telegram group as an administrator.
-- Open the group chat and enter the command "/group_add@bot_username", where "@bot_username" is the username of the new bot:
+- Open the group chat and enter the command "/group_add@username", where "@username" is the username of the new bot:
 <pre>
-/group_add@bot_username
+/group_add@username
 </pre>
 
-- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@bot_username" command to add them as bot users:
+- Wait until a new member joins the group. The bot will send you a message with information about the new member.
+- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@username" command to add them as bot users:
 <pre>
-/user_add@bot_username
+/user_add@username
 </pre>
 
 - To display information about a chat member, use the command "/member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
