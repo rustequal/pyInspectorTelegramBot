@@ -36,7 +36,7 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.09'
+VERSION = '1.10'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -55,10 +55,12 @@ def check_owner(user_id):
   return user_id == config['owner_id']
 
 
-def check_owner_set(chat_id):
+def check_owner_set(chat_id, show_tip):
   if not config['owner_id']:
-    bot.send_message(chat_id, msg[lang()]['mess_owner_not_set']
-                     + msg[lang()]['mess_bot_help_tip'])
+    text = msg[lang()]['mess_owner_not_set']
+    if show_tip:
+      text += msg[lang()]['mess_bot_help_tip']
+    bot.send_message(chat_id, text)
 
 
 def get_ids(section):
@@ -109,8 +111,7 @@ def get_age(user_id):
 
 
 def is_command_allow_user(message, owner_set):
-  res = message.chat.type == 'private' \
-      and (not owner_set or config['owner_id'])
+  res = not owner_set or config['owner_id']
   if res and config['owner_id']:
     uids = [config['owner_id'], ] + get_ids('users')
     res = message.chat.id in uids
@@ -223,10 +224,8 @@ def message_chat_member(message):
     send_message(new.user, title)
 
 
-@bot.message_handler(commands=['set_owner'])
+@bot.message_handler(commands=['set_owner'], chat_types=['private'])
 def command_set_owner(message):
-  if message.chat.type != 'private':
-    return
   args = message.text.split()[1:]
   if len(args) != 1:
     return
@@ -250,11 +249,10 @@ def command_set_owner(message):
     bot.send_message(message.chat.id, msg[lang()]['mess_password'])
 
 
-@bot.message_handler(commands=['group_add'])
+@bot.message_handler(commands=['group_add'],
+                     chat_types=['group', 'supergroup'])
 def command_group_add(message):
-  if message.chat.type not in ['group', 'supergroup']:
-    return
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, False)
   if not check_owner(message.from_user.id):
     return
   gids = get_ids('groups')
@@ -270,11 +268,12 @@ def command_group_add(message):
 
 @bot.message_handler(commands=['group_del'])
 def command_group_del(message):
-  check_owner_set(message.chat.id)
+  private = message.chat.type == 'private'
+  check_owner_set(message.chat.id, private)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
-  if message.chat.type in ['group', 'supergroup']:
+  if not private:
     if args:
       return
     chat_id = str(message.chat.id)
@@ -303,9 +302,9 @@ def command_group_del(message):
     bot.send_message(message.chat.id, msg[lang()]['mess_group_not_found'])
 
 
-@bot.message_handler(commands=['group_list'])
+@bot.message_handler(commands=['group_list'], chat_types=['private'])
 def command_group_list(message):
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, True)
   if not check_owner(message.chat.id):
     return
   if config['groups']:
@@ -318,7 +317,7 @@ def command_group_list(message):
     bot.send_message(message.chat.id, msg[lang()]['mess_group_empty'])
 
 
-@bot.message_handler(commands=['lang'])
+@bot.message_handler(commands=['lang'], chat_types=['private'])
 def command_lang(message):
   if config['owner_id'] and not check_owner(message.chat.id):
     return
@@ -330,15 +329,13 @@ def command_lang(message):
   logging.info('Language changed to "%s"', lang())
 
 
-@bot.message_handler(commands=['user_add'])
+@bot.message_handler(commands=['user_add'], chat_types=['group', 'supergroup'])
 def command_user_add(message):
-  if message.chat.type not in ['group', 'supergroup']:
-    return
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, False)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
-  if args or not message.reply_to_message \
+  if args or message.reply_to_message is None \
       or message.reply_to_message.from_user.is_bot:
     return
   user = message.reply_to_message.from_user
@@ -360,12 +357,13 @@ def command_user_add(message):
 
 @bot.message_handler(commands=['user_del'])
 def command_user_del(message):
-  check_owner_set(message.chat.id)
+  private = message.chat.type == 'private'
+  check_owner_set(message.chat.id, private)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
-  if message.chat.type in ['group', 'supergroup']:
-    if args or not message.reply_to_message \
+  if not private:
+    if args or message.reply_to_message is None \
         or message.reply_to_message.from_user.is_bot:
       return
     uname, reply = message.reply_to_message.from_user.id, True
@@ -396,9 +394,9 @@ def command_user_del(message):
     bot.send_message(message.chat.id, msg[lang()]['mess_user_not_found'])
 
 
-@bot.message_handler(commands=['user_list'])
+@bot.message_handler(commands=['user_list'], chat_types=['private'])
 def command_user_list(message):
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, True)
   if not check_owner(message.chat.id):
     return
   if config['users']:
@@ -444,9 +442,9 @@ def process_chat_member(chat_id, user_id):
   logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
 
 
-@bot.message_handler(commands=['member'])
+@bot.message_handler(commands=['member'], chat_types=['private'])
 def command_chat_member(message):
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, True)
   if not is_command_allow_user(message, True):
     return
   args = message.text.split()[1:]
@@ -463,7 +461,7 @@ def command_chat_member(message):
                      chat_types=['private'],
                      content_types=util.content_type_media)
 def message_forward_from(message):
-  check_owner_set(message.chat.id)
+  check_owner_set(message.chat.id, True)
   if not is_command_allow_user(message, True):
     return
   if message.forward_from is None:
@@ -472,7 +470,7 @@ def message_forward_from(message):
     process_chat_member(message.chat.id, message.forward_from.id)
 
 
-@bot.message_handler(commands=['help'])
+@bot.message_handler(commands=['help'], chat_types=['private'])
 def command_help(message):
   if not is_command_allow_user(message, False):
     return
@@ -484,17 +482,27 @@ def command_help(message):
 
 
 def command_start_stop(message, value, key):
-  if message.chat.type != 'private':
-    return
-  check_owner_set(message.chat.id)
-  if config['owner_id']:
-    uids = get_ids('users')
-    if message.chat.id == config['owner_id']:
+
+  def set_owner_value():
+    res = message.chat.id == config['owner_id']
+    if res:
       config['owner_enabled'] = value
-      usr_msg = f'Owner ID:{message.chat.id}'
-    elif message.chat.id in uids:
+    return res
+
+  def set_user_value():
+    res = message.chat.id in uids
+    if res:
       index = uids.index(message.chat.id)
       config['users'][index]['enabled'] = value
+    return res
+
+  check_owner_set(message.chat.id, True)
+  if config['owner_id']:
+    uids = get_ids('users')
+    if set_owner_value():
+      usr_msg = f'Owner ID:{message.chat.id}'
+      set_user_value()
+    elif set_user_value():
       usr_msg = f'User ID:{message.chat.id}'
     else:
       return
@@ -505,12 +513,12 @@ def command_start_stop(message, value, key):
     logging.info('%s %s the bot', usr_msg, com_msg)
 
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start'], chat_types=['private'])
 def command_start(message):
   command_start_stop(message, True, 'mess_bot_started')
 
 
-@bot.message_handler(commands=['stop'])
+@bot.message_handler(commands=['stop'], chat_types=['private'])
 def command_stop(message):
   command_start_stop(message, False, 'mess_bot_stopped')
 
@@ -547,6 +555,10 @@ def setup_logging():
 
 def main():
   setup_logging()
+  if not config['token']:
+    logging.error('The bot\'s authorization token is not set in "%s"',
+                  CONFIG_FILE)
+    sys.exit(1)
   bot.infinity_polling()
 
 
