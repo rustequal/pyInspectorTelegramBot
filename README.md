@@ -77,3 +77,5 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 
 - [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI)
   - A simple, but extensible Python implementation for the [Telegram Bot API](https://core.telegram.org/bots/api).
+- [AIOHTTP](https://github.com/aio-libs/aiohttp)
+  - Asynchronous HTTP Client/Server for asyncio and Python.
