@@ -12,7 +12,10 @@ import math
 import sys
 import re
 import os
-from telebot import apihelper, TeleBot, util
+import asyncio
+from telebot import asyncio_helper, util
+from telebot.async_telebot import AsyncTeleBot
+from telebot.asyncio_handler_backends import BaseMiddleware
 from mess import msg
 
 
@@ -36,13 +39,12 @@ def save_file(filename, data):
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.10'
+VERSION = '1.11'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
 ages = load_file(AGES_FILE)
-apihelper.ENABLE_MIDDLEWARE = True
-bot = TeleBot(config['token'], parse_mode='HTML', threaded=False)
+bot = AsyncTeleBot(config['token'], parse_mode='HTML')
 LOG_FILE = os.path.splitext(os.path.basename(__file__))[0] + '.log'
 LOG_LEVEL = logging.INFO
 
@@ -55,12 +57,12 @@ def check_owner(user_id):
   return user_id == config['owner_id']
 
 
-def check_owner_set(chat_id, show_tip):
+async def check_owner_set(chat_id, show_tip):
   if not config['owner_id']:
     text = msg[lang()]['mess_owner_not_set']
     if show_tip:
       text += msg[lang()]['mess_bot_help_tip']
-    bot.send_message(chat_id, text)
+    await bot.send_message(chat_id, text)
 
 
 def get_ids(section):
@@ -118,34 +120,30 @@ def is_command_allow_user(message, owner_set):
   return res
 
 
-def update_group(group):
+async def update_group(group):
   try:
-    chat = bot.get_chat(group['id'])
+    chat = await bot.get_chat(group['id'])
     if group['title'] != chat.title:
       group['title'] = chat.title
       save_file(CONFIG_FILE, config)
       logging.debug('Group ID:%d data updated: %s', group['id'], str(group))
-  except apihelper.ApiTelegramException:
+  except asyncio_helper.ApiTelegramException:
     pass
 
 
-def update_user(user):
-  member = None
+async def update_user(user):
   for group in config['groups']:
     try:
-      member = bot.get_chat_member(group['id'], user['id'])
-      if member.status != 'left':
-        break
-      member = None
-    except apihelper.ApiTelegramException:
+      member = await bot.get_chat_member(group['id'], user['id'])
+      if user['username'] != member.user.username \
+          or user['fullname'] != member.user.full_name:
+        user['username'] = member.user.username
+        user['fullname'] = member.user.full_name
+        save_file(CONFIG_FILE, config)
+        logging.debug('User ID:%d data updated: %s', user['id'], str(user))
+      break
+    except asyncio_helper.ApiTelegramException:
       pass
-
-  if member is not None and (user['username'] != member.user.username
-                             or user['fullname'] != member.user.full_name):
-    user['username'] = member.user.username
-    user['fullname'] = member.user.full_name
-    save_file(CONFIG_FILE, config)
-    logging.debug('User ID:%d data updated: %s', user['id'], str(user))
 
 
 def get_user_text(user):
@@ -172,14 +170,17 @@ def get_member_text(member):
   return text
 
 
-def get_user_photo(user):
+async def get_user_photo(user):
   photo = None
   try:
-    upp = bot.get_user_profile_photos(user.id)
+    upp = await bot.get_user_profile_photos(user.id)
     if upp.total_count > 0:
       file_id = upp.photos[0][0].file_id
-      photo = bot.download_file(bot.get_file(file_id).file_path)
-  except apihelper.ApiException:
+      file = await bot.get_file(file_id)
+      photo = await bot.download_file(file.file_path)
+  except asyncio_helper.ApiException:
+    pass
+  except UnboundLocalError:
     pass
   log_text = f'Member ID:{user.id} profile photo '
   if photo is None:
@@ -190,22 +191,22 @@ def get_user_photo(user):
   return photo
 
 
-def send_message(user, title):
+async def send_message(user, title):
   text = f'<u>{title}</u>\n' if title else ''
   text += get_user_text(user)
-  photo = get_user_photo(user)
+  photo = await get_user_photo(user)
   uids = get_enabled_uids()
   for user_id in uids:
     if photo is not None:
-      bot.send_photo(user_id, photo, text)
+      await bot.send_photo(user_id, photo, text)
     else:
-      bot.send_message(user_id, text)
+      await bot.send_message(user_id, text)
     logging.debug('Message about new member ID:%d sent to user ID:%d',
                   user.id, user_id)
 
 
 @bot.chat_member_handler()
-def message_chat_member(message):
+async def message_chat_member(message):
   gids = get_ids('groups')
   if message.chat.id not in gids:
     return
@@ -221,11 +222,11 @@ def message_chat_member(message):
     logging.info('New member in group "%s": %s',
                   message.chat.title, str(new))
     title = message.chat.title if len(config['groups']) > 1 else ''
-    send_message(new.user, title)
+    await send_message(new.user, title)
 
 
 @bot.message_handler(commands=['set_owner'], chat_types=['private'])
-def command_set_owner(message):
+async def command_set_owner(message):
   args = message.text.split()[1:]
   if len(args) != 1:
     return
@@ -242,17 +243,17 @@ def command_set_owner(message):
       config['owner_pass_salt'] = base64.b64encode(salt).decode('ascii')
       config['owner_id'] = message.chat.id
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang()]['mess_owner_succ']
-                       + msg[lang()]['mess_bot_help_tip'])
+      await bot.send_message(message.chat.id, msg[lang()]['mess_owner_succ']
+                             + msg[lang()]['mess_bot_help_tip'])
       logging.info('Owner ID:%d has been set successfully', config['owner_id'])
   else:
-    bot.send_message(message.chat.id, msg[lang()]['mess_password'])
+    await bot.send_message(message.chat.id, msg[lang()]['mess_password'])
 
 
 @bot.message_handler(commands=['group_add'],
                      chat_types=['group', 'supergroup'])
-def command_group_add(message):
-  check_owner_set(message.chat.id, False)
+async def command_group_add(message):
+  await check_owner_set(message.chat.id, False)
   if not check_owner(message.from_user.id):
     return
   gids = get_ids('groups')
@@ -262,14 +263,14 @@ def command_group_add(message):
   else:
     config['groups'].append(group_dict)
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang()]['mess_group_added'])
+  await bot.send_message(message.chat.id, msg[lang()]['mess_group_added'])
   logging.info('Group "%s" added: %s', message.chat.title, str(group_dict))
 
 
 @bot.message_handler(commands=['group_del'])
-def command_group_del(message):
+async def command_group_del(message):
   private = message.chat.type == 'private'
-  check_owner_set(message.chat.id, private)
+  await check_owner_set(message.chat.id, private)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
@@ -292,46 +293,48 @@ def command_group_del(message):
       group_dict = group
       config['groups'].pop(index)
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang()]['mess_group_deleted'])
+      await bot.send_message(message.chat.id,
+                             msg[lang()]['mess_group_deleted'])
       logging.info('Group "%s" deleted: %s', group_dict['title'],
                    str(group_dict))
       found = True
       break
 
   if not found:
-    bot.send_message(message.chat.id, msg[lang()]['mess_group_not_found'])
+    await bot.send_message(message.chat.id,
+                           msg[lang()]['mess_group_not_found'])
 
 
 @bot.message_handler(commands=['group_list'], chat_types=['private'])
-def command_group_list(message):
-  check_owner_set(message.chat.id, True)
+async def command_group_list(message):
+  await check_owner_set(message.chat.id, True)
   if not check_owner(message.chat.id):
     return
   if config['groups']:
     text = f'<b>{msg[lang()]["mess_group_list"]}:</b>\n'
     for group in config['groups']:
-      update_group(group)
+      await update_group(group)
       text += f'{group["id"]} ({group["title"]})\n'
-    bot.send_message(message.chat.id, text)
+    await bot.send_message(message.chat.id, text)
   else:
-    bot.send_message(message.chat.id, msg[lang()]['mess_group_empty'])
+    await bot.send_message(message.chat.id, msg[lang()]['mess_group_empty'])
 
 
 @bot.message_handler(commands=['lang'], chat_types=['private'])
-def command_lang(message):
+async def command_lang(message):
   if config['owner_id'] and not check_owner(message.chat.id):
     return
   lkeys = list(msg.keys())
   index = (lkeys.index(lang()) + 1) % len(lkeys)
   config['language'] = lkeys[index]
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang()]['mess_change_lang'])
+  await bot.send_message(message.chat.id, msg[lang()]['mess_change_lang'])
   logging.info('Language changed to "%s"', lang())
 
 
 @bot.message_handler(commands=['user_add'], chat_types=['group', 'supergroup'])
-def command_user_add(message):
-  check_owner_set(message.chat.id, False)
+async def command_user_add(message):
+  await check_owner_set(message.chat.id, False)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
@@ -351,14 +354,14 @@ def command_user_add(message):
   else:
     config['users'].append(user_dict)
   save_file(CONFIG_FILE, config)
-  bot.send_message(message.chat.id, msg[lang()]['mess_user_added'])
+  await bot.send_message(message.chat.id, msg[lang()]['mess_user_added'])
   logging.info('User ID:%d added: %s', user_id, str(user_dict))
 
 
 @bot.message_handler(commands=['user_del'])
-def command_user_del(message):
+async def command_user_del(message):
   private = message.chat.type == 'private'
-  check_owner_set(message.chat.id, private)
+  await check_owner_set(message.chat.id, private)
   if not check_owner(message.from_user.id):
     return
   args = message.text.split()[1:]
@@ -385,41 +388,41 @@ def command_user_del(message):
       user_dict = user
       config['users'].pop(index)
       save_file(CONFIG_FILE, config)
-      bot.send_message(message.chat.id, msg[lang()]['mess_user_deleted'])
+      await bot.send_message(message.chat.id, msg[lang()]['mess_user_deleted'])
       logging.info('User ID:%d deleted: %s', user_dict['id'], str(user_dict))
       found = True
       break
 
   if not found:
-    bot.send_message(message.chat.id, msg[lang()]['mess_user_not_found'])
+    await bot.send_message(message.chat.id, msg[lang()]['mess_user_not_found'])
 
 
 @bot.message_handler(commands=['user_list'], chat_types=['private'])
-def command_user_list(message):
-  check_owner_set(message.chat.id, True)
+async def command_user_list(message):
+  await check_owner_set(message.chat.id, True)
   if not check_owner(message.chat.id):
     return
   if config['users']:
     text = f'<b>{msg[lang()]["mess_user_list"]}:</b>\n'
     for user in config['users']:
-      update_user(user)
+      await update_user(user)
       text += str(user['id'])
       if user['username']:
         text += f' @{user["username"]}'
       text += f' ({user["fullname"]})\n'
-    bot.send_message(message.chat.id, text)
+    await bot.send_message(message.chat.id, text)
   else:
-    bot.send_message(message.chat.id, msg[lang()]['mess_user_empty'])
+    await bot.send_message(message.chat.id, msg[lang()]['mess_user_empty'])
 
 
-def process_chat_member(chat_id, user_id):
+async def process_chat_member(chat_id, user_id):
   text, log_text, photo = '', '', None
   for group in config['groups']:
-    update_group(group)
+    await update_group(group)
     member = None
     try:
-      member = bot.get_chat_member(group['id'], user_id)
-    except apihelper.ApiTelegramException:
+      member = await bot.get_chat_member(group['id'], user_id)
+    except asyncio_helper.ApiTelegramException:
       pass
     if member is not None:
       if log_text:
@@ -428,23 +431,23 @@ def process_chat_member(chat_id, user_id):
           f'{str(member)}'
       if not text:
         text = get_user_text(member.user)
-        photo = get_user_photo(member.user)
+        photo = await get_user_photo(member.user)
       text += f'\n<u>{group["title"]}</u>\n'
       text += get_member_text(member)
 
   if text:
     if photo is not None:
-      bot.send_photo(chat_id, photo, text)
+      await bot.send_photo(chat_id, photo, text)
     else:
-      bot.send_message(chat_id, text)
+      await bot.send_message(chat_id, text)
   else:
-    bot.send_message(chat_id, msg[lang()]['mess_user_not_found'])
+    await bot.send_message(chat_id, msg[lang()]['mess_user_not_found'])
   logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
 
 
 @bot.message_handler(commands=['member'], chat_types=['private'])
-def command_chat_member(message):
-  check_owner_set(message.chat.id, True)
+async def command_chat_member(message):
+  await check_owner_set(message.chat.id, True)
   if not is_command_allow_user(message, True):
     return
   args = message.text.split()[1:]
@@ -453,35 +456,35 @@ def command_chat_member(message):
   user_id = args[0][1:] if args[0][0] == '@' else args[0]
   if not user_id or not user_id.isdigit():
     return
-  process_chat_member(message.chat.id, user_id)
+  await process_chat_member(message.chat.id, user_id)
 
 
 @bot.message_handler(func=lambda message: message.forward_from is not None
                      or message.forward_sender_name is not None,
                      chat_types=['private'],
                      content_types=util.content_type_media)
-def message_forward_from(message):
-  check_owner_set(message.chat.id, True)
+async def message_forward_from(message):
+  await check_owner_set(message.chat.id, True)
   if not is_command_allow_user(message, True):
     return
   if message.forward_from is None:
-    bot.send_message(message.chat.id, msg[lang()]['mess_member_hidden'])
+    await bot.send_message(message.chat.id, msg[lang()]['mess_member_hidden'])
   else:
-    process_chat_member(message.chat.id, message.forward_from.id)
+    await process_chat_member(message.chat.id, message.forward_from.id)
 
 
 @bot.message_handler(commands=['help'], chat_types=['private'])
-def command_help(message):
+async def command_help(message):
   if not is_command_allow_user(message, False):
     return
   text = f'<b>{msg[lang()]["mess_bot_commands"]}:</b>\n'
   if not config['owner_id'] or check_owner(message.chat.id):
     text += msg[lang()]['mess_bot_help_owner']
   text += msg[lang()]['mess_bot_help_user']
-  bot.send_message(message.chat.id, text)
+  await bot.send_message(message.chat.id, text)
 
 
-def command_start_stop(message, value, key):
+async def command_start_stop(message, value, key):
 
   def set_owner_value():
     res = message.chat.id == config['owner_id']
@@ -496,7 +499,7 @@ def command_start_stop(message, value, key):
       config['users'][index]['enabled'] = value
     return res
 
-  check_owner_set(message.chat.id, True)
+  await check_owner_set(message.chat.id, True)
   if config['owner_id']:
     uids = get_ids('users')
     if set_owner_value():
@@ -507,25 +510,27 @@ def command_start_stop(message, value, key):
     else:
       return
     save_file(CONFIG_FILE, config)
-    bot.send_message(message.chat.id,
-                     msg[lang()][key] + msg[lang()]['mess_bot_help_tip'])
+    await bot.send_message(message.chat.id,
+                           msg[lang()][key] + msg[lang()]['mess_bot_help_tip'])
     com_msg = 'started' if value else 'stopped'
     logging.info('%s %s the bot', usr_msg, com_msg)
 
 
 @bot.message_handler(commands=['start'], chat_types=['private'])
-def command_start(message):
-  command_start_stop(message, True, 'mess_bot_started')
+async def command_start(message):
+  await command_start_stop(message, True, 'mess_bot_started')
 
 
 @bot.message_handler(commands=['stop'], chat_types=['private'])
-def command_stop(message):
-  command_start_stop(message, False, 'mess_bot_stopped')
+async def command_stop(message):
+  await command_start_stop(message, False, 'mess_bot_stopped')
 
 
-if LOG_LEVEL == logging.DEBUG:
-  @bot.middleware_handler(update_types=['message'])
-  def log_message(_, message):
+class DebugLogMiddleware(BaseMiddleware):
+  def __init__(self):
+    self.update_types = ['message']
+
+  async def pre_process(self, message, data):
     if message.chat.type != 'private':
       return
     if message.text is not None:
@@ -543,12 +548,16 @@ if LOG_LEVEL == logging.DEBUG:
                   'User details: %s', str(user_id), message.chat.id, text,
                   str(message.from_user))
 
+  async def post_process(self, message, data, exception):
+    pass
+
 
 def setup_logging():
-  logging.basicConfig(filename=LOG_FILE, format='%(asctime)s - '
-                      '%(levelname)s - %(message)s', level=LOG_LEVEL)
+  logging.basicConfig(handlers=[
+      logging.FileHandler(filename=LOG_FILE, encoding='utf-8')],
+      format='%(asctime)s - %(levelname)s - %(message)s', level=LOG_LEVEL)
   if LOG_LEVEL == logging.DEBUG:
-    logging.getLogger('urllib3').setLevel(logging.INFO)
+    bot.setup_middleware(DebugLogMiddleware())
   logging.info('%s version %s has started', NAME, VERSION)
   logging.debug('Python version: %s', sys.version.replace('\n', ''))
 
@@ -559,7 +568,7 @@ def main():
     logging.error('The bot\'s authorization token is not set in "%s"',
                   CONFIG_FILE)
     sys.exit(1)
-  bot.infinity_polling()
+  asyncio.run(bot.infinity_polling(allowed_updates=util.update_types))
 
 
 if __name__ == '__main__':
