@@ -2,7 +2,7 @@
 [![GPL2](https://img.shields.io/badge/license-GPL2-green)](https://github.com/rustequal/pyInspectorTelegram/blob/main/LICENSE)
 
 # pyInspectorTelegramBot
-Telegram bot working in groups. Sends available information about new group members (ID, First Name, Last Name, Username, Language Code, Premium Status, Profile Photo and the approximate date of registration) to group administrators.
+Telegram bot working in groups and channels. Sends available information about new members (ID, First Name, Last Name, Username, Language Code, Premium Status, Profile Photo and the approximate date of registration) to group administrators.
 <p align="left">
   <a href="#"><img src="docs/jonsnow.png" /></a>
 </p>
@@ -53,14 +53,19 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /set_owner &lt;PASSWORD&gt;
 </pre>
 
-- Add the bot to the telegram group as an administrator.
+- Add the bot to the telegram group or channel as an administrator.
 - Open the group chat and enter the command "/group_add@username", where "@username" is the username of the new bot:
 <pre>
 /group_add@username
 </pre>
 
-- Wait until a new member joins the group. The bot will send you a message with information about the new member.
-- If messages about new group members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@username" command to add them as bot users:
+- To add the telegram channel to the bot settings, copy the channel message to the bot's chat. The bot will output the channel ID. Next, use the command "/channel_add" to add the channel to the bot settings:
+<pre>
+/channel_add &lt;ID&gt;
+</pre>
+
+- Wait until a new member joins the group or channel. The bot will send you a message with information about the new member.
+- If messages about new members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@username" command to add them as bot users:
 <pre>
 /user_add@username
 </pre>
@@ -72,6 +77,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 
 - To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by the privacy settings, then you will not be able to do that. In this case, use the command "/member" and its numeric ID, if it is known.
 - For help on all commands, use the command "/help" in the bot's chat.
+- The list of changes and fixes is available in the file [CHANGELOG.md](/CHANGELOG.md)
 
 ## References
 

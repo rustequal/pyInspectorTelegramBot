@@ -1,6 +1,6 @@
 """
-Telegram bot working in groups. Sends available information about new group
-members to group administrators.
+Telegram bot working in groups and channels. Sends available information about
+new members to group administrators.
 """
 
 import datetime
@@ -38,11 +38,17 @@ def save_file(filename, data):
     sys.exit()
 
 
+def upgrade_config():
+  if 'channels' not in config:
+    config['channels'] = []
+
+
 NAME = 'Inspector Bot'
-VERSION = '1.11'
+VERSION = '1.12'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
+upgrade_config()
 ages = load_file(AGES_FILE)
 bot = AsyncTeleBot(config['token'], parse_mode='HTML')
 LOG_FILE = os.path.splitext(os.path.basename(__file__))[0] + '.log'
@@ -120,13 +126,14 @@ def is_command_allow_user(message, owner_set):
   return res
 
 
-async def update_group(group):
+async def update_chat(chat_dict, chat_type):
   try:
-    chat = await bot.get_chat(group['id'])
-    if group['title'] != chat.title:
-      group['title'] = chat.title
+    chat = await bot.get_chat(chat_dict['id'])
+    if chat_dict['title'] != chat.title:
+      chat_dict['title'] = chat.title
       save_file(CONFIG_FILE, config)
-      logging.debug('Group ID:%d data updated: %s', group['id'], str(group))
+      logging.debug('%s ID:%d data updated: %s', chat_type.capitalize(),
+                    chat_dict['id'], str(chat_dict))
   except asyncio_helper.ApiTelegramException:
     pass
 
@@ -146,15 +153,25 @@ async def update_user(user):
       pass
 
 
+def format_chat_title(chat_type, title):
+  return f'{msg[lang()][chat_type]}: {title}' \
+
+
+def format_chat_id(chat_id):
+  chat_id = chat_id[1:] if chat_id[0] == '@' else chat_id
+  chat_id = '-' + chat_id if not chat_id or chat_id[0] != '-' else chat_id
+  return chat_id
+
+
 def get_user_text(user):
   user, text = user.to_dict(), ''
   keys = ['id', 'first_name', 'last_name', 'username', 'language_code',
-          'is_premium']
+          'is_premium', 'is_bot']
   for key in keys:
-    if key in user and not user[key] is None:
+    if key in user and user[key]:
       if key == 'username':
         val = '@' + str(user[key])
-      elif key == 'is_premium' and user[key]:
+      elif key in ['is_premium', 'is_bot']:
         val = msg[lang()]['yes']
       else:
         val = str(user[key])
@@ -207,22 +224,23 @@ async def send_message(user, title):
 
 @bot.chat_member_handler()
 async def message_chat_member(message):
-  gids = get_ids('groups')
-  if message.chat.id not in gids:
+  chat_type = 'channel' if message.chat.type == 'channel' else 'group'
+  ids = get_ids(chat_type + 's')
+  if message.chat.id not in ids:
     return
   new = message.new_chat_member
-  logging.debug('Chat "%s" member update: {\'new_chat_member\': %s, '
-                '\'difference\': %s}', message.chat.title, str(new),
-                str(message.difference))
+  logging.debug('%s "%s" member update: {\'new_chat_member\': %s, '
+                '\'difference\': %s}', chat_type.capitalize(),
+                message.chat.title, str(new), str(message.difference))
   if 'is_member' in message.difference \
       and message.difference['is_member'] == [False, True] \
       or 'status' in message.difference \
       and message.difference['status'][0] == 'left' \
       and message.difference['status'][1] not in ['restricted', 'kicked']:
-    logging.info('New member in group "%s": %s',
-                  message.chat.title, str(new))
-    title = message.chat.title if len(config['groups']) > 1 else ''
-    await send_message(new.user, title)
+    logging.info('New member in %s "%s": %s', chat_type,
+                 message.chat.title, str(new))
+    await send_message(new.user,
+                       format_chat_title(chat_type, message.chat.title))
 
 
 @bot.message_handler(commands=['set_owner'], chat_types=['private'])
@@ -267,26 +285,15 @@ async def command_group_add(message):
   logging.info('Group "%s" added: %s', message.chat.title, str(group_dict))
 
 
-@bot.message_handler(commands=['group_del'])
+@bot.message_handler(commands=['group_del'], chat_types=['private'])
 async def command_group_del(message):
-  private = message.chat.type == 'private'
-  await check_owner_set(message.chat.id, private)
-  if not check_owner(message.from_user.id):
+  await check_owner_set(message.chat.id, True)
+  if not check_owner(message.chat.id):
     return
   args = message.text.split()[1:]
-  if not private:
-    if args:
-      return
-    chat_id = str(message.chat.id)
-  else:
-    if len(args) != 1:
-      return
-    chat_id = args[0]
-    chat_id = chat_id[1:] if chat_id[0] == '@' else chat_id
-    chat_id = '-' + chat_id if not chat_id or chat_id[0] != '-' else chat_id
-    if len(chat_id) < 2:
-      return
-
+  if len(args) != 1:
+    return
+  chat_id = format_chat_id(args[0])
   found = False
   for index, group in enumerate(config['groups']):
     if str(group['id']) == chat_id:
@@ -313,11 +320,78 @@ async def command_group_list(message):
   if config['groups']:
     text = f'<b>{msg[lang()]["mess_group_list"]}:</b>\n'
     for group in config['groups']:
-      await update_group(group)
+      await update_chat(group, 'group')
       text += f'{group["id"]} ({group["title"]})\n'
     await bot.send_message(message.chat.id, text)
   else:
     await bot.send_message(message.chat.id, msg[lang()]['mess_group_empty'])
+
+
+@bot.message_handler(commands=['channel_add'], chat_types=['private'])
+async def command_channel_add(message):
+  await check_owner_set(message.chat.id, True)
+  if not check_owner(message.chat.id):
+    return
+  args = message.text.split()[1:]
+  if len(args) != 1:
+    return
+  chat_id = format_chat_id(args[0])
+  try:
+    chat = await bot.get_chat(chat_id)
+    cids = get_ids('channels')
+    channel_dict = {'id': chat.id, 'title': chat.title}
+    if chat.id in cids:
+      config['channels'][cids.index(chat.id)] = channel_dict
+    else:
+      config['channels'].append(channel_dict)
+    save_file(CONFIG_FILE, config)
+    await bot.send_message(message.chat.id, msg[lang()]['mess_channel_added'])
+    logging.info('Channel "%s" added: %s', chat.title, str(channel_dict))
+  except asyncio_helper.ApiTelegramException:
+    await bot.send_message(message.chat.id,
+                           msg[lang()]['mess_channel_not_found'])
+
+
+@bot.message_handler(commands=['channel_del'], chat_types=['private'])
+async def command_channel_del(message):
+  await check_owner_set(message.chat.id, True)
+  if not check_owner(message.chat.id):
+    return
+  args = message.text.split()[1:]
+  if len(args) != 1:
+    return
+  chat_id = format_chat_id(args[0])
+  found = False
+  for index, channel in enumerate(config['channels']):
+    if str(channel['id']) == chat_id:
+      channel_dict = channel
+      config['channels'].pop(index)
+      save_file(CONFIG_FILE, config)
+      await bot.send_message(message.chat.id,
+                             msg[lang()]['mess_channel_deleted'])
+      logging.info('Channel "%s" deleted: %s', channel_dict['title'],
+                   str(channel_dict))
+      found = True
+      break
+
+  if not found:
+    await bot.send_message(message.chat.id,
+                           msg[lang()]['mess_channel_not_found'])
+
+
+@bot.message_handler(commands=['channel_list'], chat_types=['private'])
+async def command_channel_list(message):
+  await check_owner_set(message.chat.id, True)
+  if not check_owner(message.chat.id):
+    return
+  if config['channels']:
+    text = f'<b>{msg[lang()]["mess_channel_list"]}:</b>\n'
+    for channel in config['channels']:
+      await update_chat(channel, 'channel')
+      text += f'{channel["id"]} ({channel["title"]})\n'
+    await bot.send_message(message.chat.id, text)
+  else:
+    await bot.send_message(message.chat.id, msg[lang()]['mess_channel_empty'])
 
 
 @bot.message_handler(commands=['lang'], chat_types=['private'])
@@ -342,49 +416,34 @@ async def command_user_add(message):
       or message.reply_to_message.from_user.is_bot:
     return
   user = message.reply_to_message.from_user
-  user_id = user.id
-  username = user.username if user.username and user.username is not None \
-      else ''
+  username = user.username if user.username else ''
   fullname = ' '.join(filter(None, (user.first_name, user.last_name)))
   uids = get_ids('users')
-  user_dict = {'id': user_id, 'username': username, 'fullname': fullname,
+  user_dict = {'id': user.id, 'username': username, 'fullname': fullname,
                'enabled': True}
-  if user_id in uids:
-    config['users'][uids.index(user_id)] = user_dict
+  if user.id in uids:
+    config['users'][uids.index(user.id)] = user_dict
   else:
     config['users'].append(user_dict)
   save_file(CONFIG_FILE, config)
   await bot.send_message(message.chat.id, msg[lang()]['mess_user_added'])
-  logging.info('User ID:%d added: %s', user_id, str(user_dict))
+  logging.info('User ID:%d added: %s', user.id, str(user_dict))
 
 
-@bot.message_handler(commands=['user_del'])
+@bot.message_handler(commands=['user_del'], chat_types=['private'])
 async def command_user_del(message):
-  private = message.chat.type == 'private'
-  await check_owner_set(message.chat.id, private)
-  if not check_owner(message.from_user.id):
+  await check_owner_set(message.chat.id, True)
+  if not check_owner(message.chat.id):
     return
   args = message.text.split()[1:]
-  if not private:
-    if args or message.reply_to_message is None \
-        or message.reply_to_message.from_user.is_bot:
-      return
-    uname, reply = message.reply_to_message.from_user.id, True
-  else:
-    if len(args) != 1:
-      return
-    uname = args[0][1:] if args[0][0] == '@' else args[0]
-    if not uname:
-      return
-    reply = False
-
+  if len(args) != 1:
+    return
+  uname = args[0][1:] if args[0][0] == '@' else args[0]
+  if not uname:
+    return
   found = False
   for index, user in enumerate(config['users']):
-    if reply:
-      update = user['id'] == uname
-    else:
-      update = uname in {str(user['id']), user['username']}
-    if update:
+    if uname in {str(user['id']), user['username']}:
       user_dict = user
       config['users'].pop(index)
       save_file(CONFIG_FILE, config)
@@ -416,33 +475,54 @@ async def command_user_list(message):
 
 
 async def process_chat_member(chat_id, user_id):
-  text, log_text, photo = '', '', None
-  for group in config['groups']:
-    await update_group(group)
+
+  async def check_chat(chat, chat_type, data):
+    await update_chat(chat, chat_type)
     member = None
     try:
-      member = await bot.get_chat_member(group['id'], user_id)
+      member = await bot.get_chat_member(chat['id'], user_id)
     except asyncio_helper.ApiTelegramException:
       pass
     if member is not None:
-      if log_text:
-        log_text += ', '
-      log_text += f'Group "{group["title"]}" (ID:{group["id"]}): ' \
-          f'{str(member)}'
-      if not text:
-        text = get_user_text(member.user)
-        photo = await get_user_photo(member.user)
-      text += f'\n<u>{group["title"]}</u>\n'
-      text += get_member_text(member)
+      if data[1]:
+        data[1] += ', '
+      data[1] += f'{chat_type.capitalize()} "{chat["title"]}" ' \
+          f'(ID:{chat["id"]}): {str(member)}'
+      if not data[0]:
+        data[0] = get_user_text(member.user)
+        data[2] = await get_user_photo(member.user)
+      data[0] += f'\n<u>{format_chat_title(chat_type, chat["title"])}</u>\n'
+      data[0] += get_member_text(member)
 
-  if text:
-    if photo is not None:
-      await bot.send_photo(chat_id, photo, text)
+  data = ['', '', None]
+  for group in config['groups']:
+    await check_chat(group, 'group', data)
+  for channel in config['channels']:
+    await check_chat(channel, 'channel', data)
+
+  if data[0]:
+    if data[2] is not None:
+      await bot.send_photo(chat_id, data[2], data[0])
     else:
-      await bot.send_message(chat_id, text)
+      await bot.send_message(chat_id, data[0])
   else:
     await bot.send_message(chat_id, msg[lang()]['mess_user_not_found'])
-  logging.info('Getting chat member ID:%s info: [%s]', user_id, log_text)
+  logging.info('Getting chat member ID:%s info: [%s]', user_id, data[1])
+
+
+async def process_chat(chat_id, chat):
+
+  def format_line(key, val):
+    if val:
+      val = '@' + val if key == 'username' else val
+      return f'<b>{msg[lang()][key]}:</b> {val}\n'
+    return ''
+
+  text = format_line('id', chat.id)
+  text += format_line('title', chat.title)
+  text += format_line('username', chat.username)
+  text += format_line('type', chat.type)
+  await bot.send_message(chat_id, text)
 
 
 @bot.message_handler(commands=['member'], chat_types=['private'])
@@ -460,7 +540,8 @@ async def command_chat_member(message):
 
 
 @bot.message_handler(func=lambda message: message.forward_from is not None
-                     or message.forward_sender_name is not None,
+                     or message.forward_sender_name is not None
+                     or message.forward_from_chat is not None,
                      chat_types=['private'],
                      content_types=util.content_type_media)
 async def message_forward_from(message):
@@ -468,7 +549,11 @@ async def message_forward_from(message):
   if not is_command_allow_user(message, True):
     return
   if message.forward_from is None:
-    await bot.send_message(message.chat.id, msg[lang()]['mess_member_hidden'])
+    if message.forward_from_chat is not None:
+      await process_chat(message.chat.id, message.forward_from_chat)
+    else:
+      await bot.send_message(message.chat.id,
+                             msg[lang()]['mess_member_hidden'])
   else:
     await process_chat_member(message.chat.id, message.forward_from.id)
 
@@ -540,7 +625,7 @@ class DebugLogMiddleware(BaseMiddleware):
         if len(cmd) > 1:
           text += ' <PASSWORD>'
       else:
-        text = message.text
+        text = message.text.replace('\n', ' ')
     else:
       text = message.content_type
     user_id = message.from_user.id if message.from_user is not None else None
