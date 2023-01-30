@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.13] - 2023-01-30
+
+- Added a patch to fix the "pyTelegramBotAPI 4.9.0" library [bug](https://github.com/eternnoir/pyTelegramBotAPI/issues/1896)
+- Minor fixes and optimizations
+
 ## [1.12] - 2023-01-30
 
 - Added support for Telegram channels. Now the bot can be added to the channel administrators and receive information about new and existing channel members. Added commands "/channel_add", "/channel_del" and "/channel_list". See the "Usage" section  for more information.

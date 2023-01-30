@@ -44,7 +44,7 @@ def upgrade_config():
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.12'
+VERSION = '1.13'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -223,24 +223,24 @@ async def send_message(user, title):
 
 
 @bot.chat_member_handler()
-async def message_chat_member(message):
-  chat_type = 'channel' if message.chat.type == 'channel' else 'group'
+async def message_chat_member(cmu):
+  chat_type = 'channel' if cmu.chat.type == 'channel' else 'group'
   ids = get_ids(chat_type + 's')
-  if message.chat.id not in ids:
+  if cmu.chat.id not in ids:
     return
-  new = message.new_chat_member
+  new = cmu.new_chat_member
   logging.debug('%s "%s" member update: {\'new_chat_member\': %s, '
                 '\'difference\': %s}', chat_type.capitalize(),
-                message.chat.title, str(new), str(message.difference))
-  if 'is_member' in message.difference \
-      and message.difference['is_member'] == [False, True] \
-      or 'status' in message.difference \
-      and message.difference['status'][0] == 'left' \
-      and message.difference['status'][1] not in ['restricted', 'kicked']:
+                cmu.chat.title, str(new), str(cmu.difference))
+  if 'is_member' in cmu.difference \
+      and cmu.difference['is_member'] == [False, True] \
+      or 'status' in cmu.difference \
+      and cmu.difference['status'][0] in ['left', 'kicked'] \
+      and cmu.difference['status'][1] not in ['restricted', 'kicked', 'left']:
     logging.info('New member in %s "%s": %s', chat_type,
-                 message.chat.title, str(new))
+                 cmu.chat.title, str(new))
     await send_message(new.user,
-                       format_chat_title(chat_type, message.chat.title))
+                       format_chat_title(chat_type, cmu.chat.title))
 
 
 @bot.message_handler(commands=['set_owner'], chat_types=['private'])
@@ -653,7 +653,7 @@ def main():
     logging.error('The bot\'s authorization token is not set in "%s"',
                   CONFIG_FILE)
     sys.exit(1)
-  asyncio.run(bot.infinity_polling(allowed_updates=util.update_types))
+  asyncio.run(bot.infinity_polling(allowed_updates=["message", "chat_member"]))
 
 
 if __name__ == '__main__':
