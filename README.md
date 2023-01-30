@@ -59,7 +59,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /group_add@username
 </pre>
 
-- To add the telegram channel to the bot settings, copy the channel message to the bot's chat. The bot will output the channel ID. Next, use the command "/channel_add" to add the channel to the bot settings:
+- To add a telegram channel to the bot settings, copy the channel message to the bot's chat. The bot will output the channel ID. Next, use the command "/channel_add" to add the channel to the bot settings:
 <pre>
 /channel_add &lt;ID&gt;
 </pre>
@@ -77,7 +77,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 
 - To get information about the member, you can forward his message to the bot's chat. For example, this way you can find out his ID number. But if his account is hidden by the privacy settings, then you will not be able to do that. In this case, use the command "/member" and its numeric ID, if it is known.
 - For help on all commands, use the command "/help" in the bot's chat.
-- The list of changes and fixes is available in the file [CHANGELOG.md](/CHANGELOG.md)
+- The list of versions, changes and fixes is available in [CHANGELOG.md](/CHANGELOG.md)
 
 ## References
 
