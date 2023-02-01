@@ -53,29 +53,25 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 </pre>
 
 ## Usage
-- After starting the bot, you need to set the owner and his password with the "/set_owner" command. With the same command, you can change the owner, as well as change the owner's password. Open a chat with the bot and enter the command:
+- After starting the bot, you need to set the owner and his password with the "/owner" command. With the same command, you can change the owner, as well as change the owner's password. Open a chat with the bot and enter the command:
 <pre>
-/set_owner &lt;PASSWORD&gt;
+/owner &lt;PASSWORD&gt;
 </pre>
 
 - Add the bot to the telegram group or channel as an administrator.
-- Open the group chat and enter the command "/group_add@username", where "@username" is the username of the new bot:
+- If you want to work with Telegram groups open the group chat and enter the command "/group_add@username", where "@username" is the username of the new bot:
 <pre>
 /group_add@username
 </pre>
 
-- To add a telegram channel to the bot settings, copy the channel message to the bot's chat. The bot will output the channel ID. Next, use the command "/channel_add" to add the channel to the bot settings:
+- To add a Telegram channel to the bot settings, copy the channel message to the bot's chat. The bot will output the channel ID. Next, use the command "/channel_add" to add the channel to the bot settings:
 <pre>
 /channel_add &lt;ID&gt;
 </pre>
 
 - Wait until a new member joins the group or channel. The bot will send you a message with information about the new member.
-- If messages about new members need to be sent to other users, then you need to reply to their messages in the group chat with the "/user_add@username" command to add them as bot users:
-<pre>
-/user_add@username
-</pre>
-
-- To display information about a chat member, use the command "/member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
+- If messages about new members need to be sent to other users, then you need to create a password with the command "/user_add" and forward it to a new user. The new user must open a chat with the bot and enter the specified command with a password.
+- To show information about a chat member, use the command "/member" in the bot's chat. The numeric ID of the member must be specified as a parameter:
 <pre>
 /member &lt;ID&gt;
 </pre>

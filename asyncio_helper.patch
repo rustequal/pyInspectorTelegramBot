@@ -1,10 +1,12 @@
---- asyncio_helper.py	2023-01-30 23:41:29.118677694 +0000
-+++ telegram/lib/python3.10/site-packages/telebot/asyncio_helper.py	2023-01-30 23:43:03.662310804 +0000
-@@ -244,7 +244,7 @@
+--- asyncio_helper.py	2023-02-01 07:46:51.756325279 +0000
++++ telegram/lib/python3.10/site-packages/telebot/asyncio_helper.py	2023-02-01 07:42:25.203774311 +0000
+@@ -243,8 +243,8 @@
+         params['limit'] = limit
      if timeout:
          params['timeout'] = timeout
-     if allowed_updates:
+-    if allowed_updates:
 -        params['allowed_updates'] = allowed_updates
++    if allowed_updates is not None:  # Empty lists should pass
 +        params['allowed_updates'] = json.dumps(allowed_updates)
      return await _process_request(token, method_name, params=params, request_timeout=request_timeout)
  

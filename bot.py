@@ -12,6 +12,9 @@ import math
 import sys
 import re
 import os
+import string
+import secrets
+import threading
 import asyncio
 from telebot import asyncio_helper, util
 from telebot.async_telebot import AsyncTeleBot
@@ -25,7 +28,7 @@ def load_file(filename):
       data = json.load(file)
   except OSError:
     print('Could not load file:', filename)
-    sys.exit()
+    sys.exit(1)
   return data
 
 
@@ -35,21 +38,43 @@ def save_file(filename, data):
       file.write(json.dumps(data, indent=2))
   except OSError:
     print('Could not save file:', filename)
-    sys.exit()
+    sys.exit(1)
 
 
-def upgrade_config():
+def get_fullname(first_name, last_name):
+  return ' '.join(filter(None, (first_name, last_name)))
+
+
+def get_user_dict(user_id, username, first_name, last_name, enabled):
+  username = username if username else ''
+  fullname = get_fullname(first_name, last_name)
+  return {'id': user_id, 'username': username,
+          'fullname': fullname, 'enabled': enabled}
+
+
+def update_config():
   if 'channels' not in config:
     config['channels'] = []
+  if 'owner' not in config:
+    if config['owner_id']:
+      config['owner'] = get_user_dict(config['owner_id'], '', '', '',
+                                      config['owner_enabled'])
+    else:
+      config['owner'] = {}
+    config.pop('owner_id')
+    config.pop('owner_enabled')
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.13'
+VERSION = '1.14'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
-upgrade_config()
+update_config()
 ages = load_file(AGES_FILE)
+PASS_MAX_AGE = 120
+PASS_LEN = 16
+private = {'timer': None, 'password': ''}
 bot = AsyncTeleBot(config['token'], parse_mode='HTML')
 LOG_FILE = os.path.splitext(os.path.basename(__file__))[0] + '.log'
 LOG_LEVEL = logging.INFO
@@ -60,11 +85,11 @@ def lang():
 
 
 def check_owner(user_id):
-  return user_id == config['owner_id']
+  return config['owner'] and user_id == config['owner']['id']
 
 
 async def check_owner_set(chat_id, show_tip):
-  if not config['owner_id']:
+  if not config['owner']:
     text = msg[lang()]['mess_owner_not_set']
     if show_tip:
       text += msg[lang()]['mess_bot_help_tip']
@@ -76,11 +101,29 @@ def get_ids(section):
 
 
 def get_enabled_uids():
-  uids = [config['owner_id'], ] if config['owner_enabled'] else []
+  uids = [config['owner']['id'], ] \
+      if config['owner'] and config['owner']['enabled'] else []
   for user in config['users']:
     if user['enabled'] and user['id'] not in uids:
       uids.append(user['id'])
   return uids
+
+
+def get_owner(user):
+  owner = get_user_dict(user.id, user.username, user.first_name,
+                        user.last_name, True)
+  if config['owner']:
+    if config['owner']['id'] != user.id:
+      uids = get_ids('users')
+      if config['owner']['id'] not in uids:
+        config['users'].append(config['owner'])
+      if user.id in uids:
+        index = uids.index(user.id)
+        owner = config['users'][index]
+        config['users'].pop(index)
+    else:
+      owner = config['owner']
+  return owner
 
 
 def get_timestamp(user_id):
@@ -118,10 +161,19 @@ def get_age(user_id):
   return res + str(date.month).zfill(2) + '/' + str(date.year)
 
 
+def password_generate():
+  alph = string.ascii_letters + string.digits
+  private['password'] = ''.join(secrets.choice(alph) for i in range(PASS_LEN))
+
+
+def password_reset():
+  private['password'] = ''
+
+
 def is_command_allow_user(message, owner_set):
-  res = not owner_set or config['owner_id']
-  if res and config['owner_id']:
-    uids = [config['owner_id'], ] + get_ids('users')
+  res = not owner_set or config['owner']
+  if res and config['owner']:
+    uids = [config['owner']['id'], ] + get_ids('users')
     res = message.chat.id in uids
   return res
 
@@ -142,10 +194,11 @@ async def update_user(user):
   for group in config['groups']:
     try:
       member = await bot.get_chat_member(group['id'], user['id'])
+      fullname = get_fullname(member.user.first_name, member.user.last_name)
       if user['username'] != member.user.username \
-          or user['fullname'] != member.user.full_name:
+          or user['fullname'] != fullname:
         user['username'] = member.user.username
-        user['fullname'] = member.user.full_name
+        user['fullname'] = fullname
         save_file(CONFIG_FILE, config)
         logging.debug('User ID:%d data updated: %s', user['id'], str(user))
       break
@@ -153,14 +206,14 @@ async def update_user(user):
       pass
 
 
-def format_chat_title(chat_type, title):
-  return f'{msg[lang()][chat_type]}: {title}' \
-
-
 def format_chat_id(chat_id):
   chat_id = chat_id[1:] if chat_id[0] == '@' else chat_id
   chat_id = '-' + chat_id if not chat_id or chat_id[0] != '-' else chat_id
   return chat_id
+
+
+def get_chat_title(chat_type, title):
+  return f'<u>{msg[lang()][chat_type]}: {title}</u>\n'
 
 
 def get_user_text(user):
@@ -208,8 +261,8 @@ async def get_user_photo(user):
   return photo
 
 
-async def send_message(user, title):
-  text = f'<u>{title}</u>\n' if title else ''
+async def send_message(user, chat_type, title):
+  text = get_chat_title(chat_type, title)
   text += get_user_text(user)
   photo = await get_user_photo(user)
   uids = get_enabled_uids()
@@ -239,15 +292,15 @@ async def message_chat_member(cmu):
       and cmu.difference['status'][1] not in ['restricted', 'kicked', 'left']:
     logging.info('New member in %s "%s": %s', chat_type,
                  cmu.chat.title, str(new))
-    await send_message(new.user,
-                       format_chat_title(chat_type, cmu.chat.title))
+    await send_message(new.user, chat_type, cmu.chat.title)
 
 
-@bot.message_handler(commands=['set_owner'], chat_types=['private'])
-async def command_set_owner(message):
+@bot.message_handler(commands=['owner'], chat_types=['private'])
+async def command_owner(message):
   args = message.text.split()[1:]
   if len(args) != 1:
     return
+  chat = message.chat
   reg = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{16,20}$'
   pat = re.compile(reg)
   if re.search(pat, args[0]):
@@ -255,17 +308,18 @@ async def command_set_owner(message):
     if not salt:
       salt = os.urandom(32)
     key = hashlib.pbkdf2_hmac('sha256', args[0].encode('utf-8'), salt, 100000)
-    if check_owner(message.chat.id) or not config['owner_pass_hash'] \
+    if not config['owner'] or check_owner(chat.id) \
         or key == base64.b64decode(config['owner_pass_hash'].encode('ascii')):
       config['owner_pass_hash'] = base64.b64encode(key).decode('ascii')
       config['owner_pass_salt'] = base64.b64encode(salt).decode('ascii')
-      config['owner_id'] = message.chat.id
+      config['owner'] = get_owner(chat)
       save_file(CONFIG_FILE, config)
       await bot.send_message(message.chat.id, msg[lang()]['mess_owner_succ']
                              + msg[lang()]['mess_bot_help_tip'])
-      logging.info('Owner ID:%d has been set successfully', config['owner_id'])
-  else:
-    await bot.send_message(message.chat.id, msg[lang()]['mess_password'])
+      logging.info('Owner ID:%d has been set successfully',
+                   config['owner']['id'])
+  elif not config['owner'] or check_owner(chat.id):
+    await bot.send_message(message.chat.id, msg[lang()]['mess_owner_password'])
 
 
 @bot.message_handler(commands=['group_add'],
@@ -396,7 +450,7 @@ async def command_channel_list(message):
 
 @bot.message_handler(commands=['lang'], chat_types=['private'])
 async def command_lang(message):
-  if config['owner_id'] and not check_owner(message.chat.id):
+  if config['owner'] and not check_owner(message.chat.id):
     return
   lkeys = list(msg.keys())
   index = (lkeys.index(lang()) + 1) % len(lkeys)
@@ -406,28 +460,35 @@ async def command_lang(message):
   logging.info('Language changed to "%s"', lang())
 
 
-@bot.message_handler(commands=['user_add'], chat_types=['group', 'supergroup'])
+@bot.message_handler(commands=['user_add'], chat_types=['private'])
 async def command_user_add(message):
-  await check_owner_set(message.chat.id, False)
-  if not check_owner(message.from_user.id):
+  await check_owner_set(message.chat.id, True)
+  if not config['owner']:
     return
   args = message.text.split()[1:]
-  if args or message.reply_to_message is None \
-      or message.reply_to_message.from_user.is_bot:
-    return
-  user = message.reply_to_message.from_user
-  username = user.username if user.username else ''
-  fullname = ' '.join(filter(None, (user.first_name, user.last_name)))
-  uids = get_ids('users')
-  user_dict = {'id': user.id, 'username': username, 'fullname': fullname,
-               'enabled': True}
-  if user.id in uids:
-    config['users'][uids.index(user.id)] = user_dict
+  if check_owner(message.chat.id):
+    if len(args) > 0:
+      return
+    password_generate()
+    await bot.send_message(message.chat.id, msg[lang()]['mess_user_pass']
+                           % (PASS_MAX_AGE, private['password']))
+    private['timer'] = threading.Timer(PASS_MAX_AGE, password_reset)
+    private['timer'].start()
   else:
+    user = message.chat
+    uids = get_ids('users')
+    password = private['password']
+    if user.id in uids or not password or len(args) != 1 \
+        or password != args[0]:
+      return
+    password_reset()
+    user_dict = get_user_dict(user.id, user.username, user.first_name,
+                              user.last_name, True)
     config['users'].append(user_dict)
-  save_file(CONFIG_FILE, config)
-  await bot.send_message(message.chat.id, msg[lang()]['mess_user_added'])
-  logging.info('User ID:%d added: %s', user.id, str(user_dict))
+    save_file(CONFIG_FILE, config)
+    await bot.send_message(message.chat.id, msg[lang()]['mess_user_added']
+                           + msg[lang()]['mess_bot_help_tip'])
+    logging.info('User ID:%d added: %s', user.id, str(user_dict))
 
 
 @bot.message_handler(commands=['user_del'], chat_types=['private'])
@@ -491,7 +552,7 @@ async def process_chat_member(chat_id, user_id):
       if not data[0]:
         data[0] = get_user_text(member.user)
         data[2] = await get_user_photo(member.user)
-      data[0] += f'\n<u>{format_chat_title(chat_type, chat["title"])}</u>\n'
+      data[0] += '\n' + get_chat_title(chat_type, chat["title"])
       data[0] += get_member_text(member)
 
   data = ['', '', None]
@@ -523,6 +584,7 @@ async def process_chat(chat_id, chat):
   text += format_line('username', chat.username)
   text += format_line('type', chat.type)
   await bot.send_message(chat_id, text)
+  logging.info('Getting chat ID:%s info: [%s]', chat.id, str(chat))
 
 
 @bot.message_handler(commands=['member'], chat_types=['private'])
@@ -563,7 +625,7 @@ async def command_help(message):
   if not is_command_allow_user(message, False):
     return
   text = f'<b>{msg[lang()]["mess_bot_commands"]}:</b>\n'
-  if not config['owner_id'] or check_owner(message.chat.id):
+  if not config['owner'] or check_owner(message.chat.id):
     text += msg[lang()]['mess_bot_help_owner']
   text += msg[lang()]['mess_bot_help_user']
   await bot.send_message(message.chat.id, text)
@@ -572,9 +634,9 @@ async def command_help(message):
 async def command_start_stop(message, value, key):
 
   def set_owner_value():
-    res = message.chat.id == config['owner_id']
+    res = message.chat.id == config['owner']['id']
     if res:
-      config['owner_enabled'] = value
+      config['owner']['enabled'] = value
     return res
 
   def set_user_value():
@@ -585,7 +647,7 @@ async def command_start_stop(message, value, key):
     return res
 
   await check_owner_set(message.chat.id, True)
-  if config['owner_id']:
+  if config['owner']:
     uids = get_ids('users')
     if set_owner_value():
       usr_msg = f'Owner ID:{message.chat.id}'
