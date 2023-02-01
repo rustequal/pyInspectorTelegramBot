@@ -1,5 +1,5 @@
---- asyncio_helper.py	2023-02-01 07:46:51.756325279 +0000
-+++ telegram/lib/python3.10/site-packages/telebot/asyncio_helper.py	2023-02-01 07:42:25.203774311 +0000
+--- asyncio_helper.py	2023-02-01 09:15:32.941192988 +0000
++++ telegram/lib/python3.10/site-packages/telebot/asyncio_helper.py	2023-02-01 09:15:50.941094180 +0000
 @@ -243,8 +243,8 @@
          params['limit'] = limit
      if timeout:
