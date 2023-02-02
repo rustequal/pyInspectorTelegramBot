@@ -58,7 +58,7 @@ user@vps:~$ sudo tail /opt/inspector-bot/bot.log
 /owner &lt;PASSWORD&gt;
 </pre>
 
-- Add the bot to the telegram group or channel as an administrator.
+- Add the bot to the telegram group or channel as an administrator. The bot does not need any special permissions. The main thing is to be an administrator. Therefore, all permission switches can be turned off.
 - If you want to work with Telegram groups, open the group chat and enter the "/group_add@username" command, where "@username" is the username of the new bot:
 <pre>
 /group_add@username

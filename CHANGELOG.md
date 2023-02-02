@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.15] - 2023-02-02
+
+- Minor fixes and optimizations
+
 ## [1.14] - 2023-02-01
 
 - Changed the "/user_add" command. Now, in order to create a new user, the owner must create a password and forward it to the new user. This eliminates the need to find a new user in the Telegram group if the bot is used only for working in channels.

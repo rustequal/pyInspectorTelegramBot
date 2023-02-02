@@ -66,7 +66,7 @@ def update_config():
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.14'
+VERSION = '1.15'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -152,9 +152,9 @@ def get_timestamp(user_id):
 def get_age(user_id):
   tst = get_timestamp(user_id)
   if tst[0] < 0:
-    res = msg[lang()]['before']
+    res = msg[lang()]['mess_keys']['before']
   elif tst[0] > 0:
-    res = msg[lang()]['after']
+    res = msg[lang()]['mess_keys']['after']
   else:
     res = '~ '
   date = datetime.datetime.fromtimestamp(tst[1] / 1e3)
@@ -213,7 +213,8 @@ def format_chat_id(chat_id):
 
 
 def get_chat_title(chat_type, title):
-  return f'<u>{msg[lang()][chat_type]}: {title}</u>\n'
+  chat_key = msg[lang()]['mess_keys'][chat_type]
+  return f'<u>{chat_key}: {title}</u>\n'
 
 
 def get_user_text(user):
@@ -225,18 +226,20 @@ def get_user_text(user):
       if key == 'username':
         val = '@' + str(user[key])
       elif key in ['is_premium', 'is_bot']:
-        val = msg[lang()]['yes']
+        val = msg[lang()]['mess_keys']['yes']
       else:
         val = str(user[key])
-      text += f'<b>{msg[lang()][key]}:</b> {val}\n'
+      text_key = msg[lang()]['mess_keys'][key]
+      text += f'<b>{text_key}:</b> {val}\n'
   if user['id'] < int(list(ages.keys())[-1]):
-    rd_key = msg[lang()]["registration_date"]
+    rd_key = msg[lang()]['mess_keys']['registration_date']
     text += f'<b>{rd_key}:</b> {get_age(user["id"])}\n'
   return text
 
 
 def get_member_text(member):
-  text = f'<b>{msg[lang()]["status"]}:</b> {str(member.status)}\n'
+  status_key = msg[lang()]['mess_keys']['status']
+  text = f'<b>{status_key}:</b> {str(member.status)}\n'
   return text
 
 
@@ -472,6 +475,8 @@ async def command_user_add(message):
     password_generate()
     await bot.send_message(message.chat.id, msg[lang()]['mess_user_pass']
                            % (PASS_MAX_AGE, private['password']))
+    if private['timer'] is not None:
+      private['timer'].cancel()
     private['timer'] = threading.Timer(PASS_MAX_AGE, password_reset)
     private['timer'].start()
   else:
@@ -573,16 +578,17 @@ async def process_chat_member(chat_id, user_id):
 
 async def process_chat(chat_id, chat):
 
-  def format_line(key, val):
+  def format_text(key, val):
     if val:
       val = '@' + val if key == 'username' else val
-      return f'<b>{msg[lang()][key]}:</b> {val}\n'
+      text_key = msg[lang()]['mess_keys'][key]
+      return f'<b>{text_key}:</b> {val}\n'
     return ''
 
-  text = format_line('id', chat.id)
-  text += format_line('title', chat.title)
-  text += format_line('username', chat.username)
-  text += format_line('type', chat.type)
+  text = format_text('id', chat.id)
+  text += format_text('title', chat.title)
+  text += format_text('username', chat.username)
+  text += format_text('type', chat.type)
   await bot.send_message(chat_id, text)
   logging.info('Getting chat ID:%s info: [%s]', chat.id, str(chat))
 
