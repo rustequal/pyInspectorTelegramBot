@@ -30,6 +30,7 @@ user@vps:~$ sudo su bot
 bot@vps:/home/user$ cd
 bot@vps:~$ python3 -m venv telegram
 bot@vps:~$ source telegram/bin/activate
+(telegram) bot@vps:~$ pip3 install wheel
 (telegram) bot@vps:~$ pip3 install -r requirements.txt
 </pre>
 
