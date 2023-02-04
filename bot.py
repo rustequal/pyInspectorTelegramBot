@@ -66,7 +66,7 @@ def update_config():
 
 
 NAME = 'Inspector Bot'
-VERSION = '1.15'
+VERSION = '1.16'
 CONFIG_FILE = 'config.json'
 AGES_FILE = 'ages.json'
 config = load_file(CONFIG_FILE)
@@ -206,6 +206,17 @@ async def update_user(user):
       pass
 
 
+async def get_admin_status(chat_id):
+  res = False
+  try:
+    if bot.user is not None:
+      member = await bot.get_chat_member(chat_id, bot.user.id)
+      res = member.status == 'administrator'
+  except asyncio_helper.ApiTelegramException:
+    pass
+  return res
+
+
 def format_chat_id(chat_id):
   chat_id = chat_id[1:] if chat_id[0] == '@' else chat_id
   chat_id = '-' + chat_id if not chat_id or chat_id[0] != '-' else chat_id
@@ -331,14 +342,19 @@ async def command_group_add(message):
   await check_owner_set(message.chat.id, False)
   if not check_owner(message.from_user.id):
     return
+  chat_id = message.chat.id
+  is_admin = await get_admin_status(chat_id)
   gids = get_ids('groups')
-  group_dict = {'id': message.chat.id, 'title': message.chat.title}
-  if message.chat.id in gids:
-    config['groups'][gids.index(message.chat.id)] = group_dict
+  group_dict = {'id': chat_id, 'title': message.chat.title}
+  if chat_id in gids:
+    config['groups'][gids.index(chat_id)] = group_dict
   else:
     config['groups'].append(group_dict)
   save_file(CONFIG_FILE, config)
-  await bot.send_message(message.chat.id, msg[lang()]['mess_group_added'])
+  text = msg[lang()]['mess_group_added']
+  if not is_admin:
+    text += msg[lang()]['mess_bot_admin']
+  await bot.send_message(chat_id, text)
   logging.info('Group "%s" added: %s', message.chat.title, str(group_dict))
 
 
@@ -393,6 +409,7 @@ async def command_channel_add(message):
   if len(args) != 1:
     return
   chat_id = format_chat_id(args[0])
+  is_admin = await get_admin_status(chat_id)
   try:
     chat = await bot.get_chat(chat_id)
     cids = get_ids('channels')
@@ -402,7 +419,10 @@ async def command_channel_add(message):
     else:
       config['channels'].append(channel_dict)
     save_file(CONFIG_FILE, config)
-    await bot.send_message(message.chat.id, msg[lang()]['mess_channel_added'])
+    text = msg[lang()]['mess_channel_added']
+    if not is_admin:
+      text += msg[lang()]['mess_bot_admin']
+    await bot.send_message(message.chat.id, text)
     logging.info('Channel "%s" added: %s', chat.title, str(channel_dict))
   except asyncio_helper.ApiTelegramException:
     await bot.send_message(message.chat.id,

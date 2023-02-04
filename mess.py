@@ -48,8 +48,8 @@ msg = {
     'mess_member_hidden': 'The account was hidden by the user',
     'mess_bot_commands': 'Bot commands',
     'mess_bot_started': 'The bot has started and will send messages',
-    'mess_bot_stopped': 'The bot has been stopped and will not send ' \
-        'messages',
+    'mess_bot_stopped': 'The bot has been stopped and will not send messages',
+    'mess_bot_admin': '.\nMake sure that the bot is an administrator!',
     'mess_bot_help_tip': '.\nFor help, enter the command /help',
     'mess_bot_help_owner': '/owner <code>password</code> - set ' \
         'owner and password\n' \
@@ -117,6 +117,7 @@ msg = {
     'mess_bot_commands': 'Команды бота',
     'mess_bot_started': 'Бот запущен и будет присылать сообщения',
     'mess_bot_stopped': 'Бот остановлен и не будет присылать сообщения',
+    'mess_bot_admin': '.\nУбедитесь в том, что бот является администратором!',
     'mess_bot_help_tip': '.\nДля справки введите команду /help',
     'mess_bot_help_owner': '/owner <code>пароль</code> - задать ' \
         'владельца и его пароль\n' \
