@@ -40,11 +40,6 @@ bot@vps:~$ source telegram/bin/activate
 (telegram) bot@vps:~$ exit
 </pre>
 
-- Patching the [bug](https://github.com/eternnoir/pyTelegramBotAPI/issues/1896) in "pyTelegramBotAPI 4.9.0" library:
-<pre>
-user@vps:~$ sudo patch /opt/inspector-bot/telegram/lib/python3.10/site-packages/telebot/asyncio_helper.py < pyInspectorTelegramBot/asyncio_helper.patch
-</pre>
-
 - Starting the bot service, setting up the autostart of the service, checking the logs:
 <pre>
 user@vps:~$ sudo systemctl daemon-reload
